@@ -135,6 +135,75 @@
   }
   .file-drop input{margin-top:12px;}
 
+  .gh-field{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+    flex-wrap:wrap;
+  }
+  .gh-field label{
+    min-width:70px;
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--ink-soft);
+  }
+  .gh-field input{
+    flex:1;
+    min-width:140px;
+    padding:8px 10px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-family:'Space Grotesk', monospace;
+    font-size:13.5px;
+    background:#FBFCFE;
+    color:var(--ink);
+  }
+  .gh-field input:focus{ outline:2px solid var(--primary); outline-offset:1px; }
+
+  .gh-file-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin-top:14px;
+    max-height:220px;
+    overflow-y:auto;
+  }
+  .gh-file-list.is-hidden{ display:none; }
+  .gh-file-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 12px;
+    background:#F5F7FB;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-size:13.5px;
+    cursor:pointer;
+    transition:border-color .12s ease, background .12s ease;
+  }
+  .gh-file-row:hover{ border-color:var(--primary); background:#EEF1FB; }
+  .gh-file-row .name{
+    font-family:'Space Grotesk', monospace;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color:var(--ink);
+  }
+  .gh-file-row .pick{
+    color:var(--primary);
+    font-weight:700;
+    font-size:12.5px;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .gh-file-note{
+    padding:10px 4px;
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+
   .preview{
     margin-top:18px;
     border-top:1px solid var(--border);
@@ -546,7 +615,7 @@
     header.top .subtitle{ font-size:12px; }
 
     .tabs{ gap:0; }
-    .tab-btn{ flex:1; margin-right:0; text-align:center; padding:10px 2px; font-size:13.5px; }
+    .tab-btn{ flex:1; margin-right:0; text-align:center; padding:10px 2px; font-size:12px; }
 
     .prompt-card{ padding:18px 16px; }
     .prompt-text{ font-size:18px; }
@@ -662,6 +731,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="text">텍스트로 입력</button>
       <button class="tab-btn" data-tab="excel">엑셀 업로드</button>
+      <button class="tab-btn" data-tab="github">깃허브에서 불러오기</button>
     </div>
 
     <div class="tab-content active" id="tab-text">
@@ -679,6 +749,30 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
         <span style="font-size:12px;">A열: 영어 문장 &nbsp;·&nbsp; B열: 한글 뜻 (제목 줄이 있어도 자동으로 건너뜁니다)</span><br>
         <input type="file" id="excel-input" accept=".xlsx,.xls">
       </div>
+    </div>
+
+    <div class="tab-content" id="tab-github">
+      <div class="gh-field">
+        <label for="gh-owner">사용자/조직</label>
+        <input type="text" id="gh-owner" placeholder="예: myid">
+      </div>
+      <div class="gh-field">
+        <label for="gh-repo">저장소</label>
+        <input type="text" id="gh-repo" placeholder="예: my-repo">
+      </div>
+      <div class="gh-field">
+        <label for="gh-path">폴더 경로</label>
+        <input type="text" id="gh-path" placeholder="비워두면 저장소 최상위 폴더">
+      </div>
+      <div class="gh-field">
+        <label for="gh-branch">브랜치</label>
+        <input type="text" id="gh-branch" placeholder="비워두면 기본 브랜치 사용">
+      </div>
+      <p class="hint">공개(public) 저장소만 지원합니다. 이 페이지가 GitHub Pages(*.github.io)에서 열려 있다면 사용자·저장소·폴더를 자동으로 채워봅니다 (필요하면 직접 수정하세요).</p>
+      <div style="margin-top:10px;">
+        <button class="ghost-btn" id="gh-list-btn">엑셀 파일 목록 불러오기</button>
+      </div>
+      <div id="gh-file-list" class="gh-file-list is-hidden"></div>
     </div>
 
     <div id="parse-error" class="error-msg" style="display:none;"></div>
@@ -818,6 +912,13 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   var previewList = document.getElementById('preview-list');
   var startBtn = document.getElementById('start-btn');
 
+  var ghOwnerInput = document.getElementById('gh-owner');
+  var ghRepoInput = document.getElementById('gh-repo');
+  var ghPathInput = document.getElementById('gh-path');
+  var ghBranchInput = document.getElementById('gh-branch');
+  var ghListBtn = document.getElementById('gh-list-btn');
+  var ghFileList = document.getElementById('gh-file-list');
+
   var timerEnableCb = document.getElementById('timer-enable');
   var timerSecondsRow = document.getElementById('timer-seconds-row');
   var timerSecondsInput = document.getElementById('timer-seconds');
@@ -954,7 +1055,22 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     setSentenceSet(result);
   });
 
-  // ---------- excel parsing ----------
+  // ---------- excel parsing (shared by local upload and GitHub loading) ----------
+  function parseSentencesFromWorkbookData(data){
+    var wb = XLSX.read(data, { type: 'array' });
+    var sheet = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    var result = [];
+    rows.forEach(function(row){
+      var en = (row[0] !== undefined ? String(row[0]) : '').trim();
+      var kr = (row[1] !== undefined ? String(row[1]) : '').trim();
+      if (!en || !kr) return;
+      if (/^(english|sentence|영어|영어문장|문장)$/i.test(en)) return; // skip header row
+      result.push({ en: en, kr: kr });
+    });
+    return result;
+  }
+
   excelInput.addEventListener('change', function(e){
     showError('');
     var file = e.target.files[0];
@@ -963,17 +1079,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     reader.onload = function(evt){
       try {
         var data = new Uint8Array(evt.target.result);
-        var wb = XLSX.read(data, { type: 'array' });
-        var sheet = wb.Sheets[wb.SheetNames[0]];
-        var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-        var result = [];
-        rows.forEach(function(row){
-          var en = (row[0] !== undefined ? String(row[0]) : '').trim();
-          var kr = (row[1] !== undefined ? String(row[1]) : '').trim();
-          if (!en || !kr) return;
-          if (/^(english|sentence|영어|영어문장|문장)$/i.test(en)) return; // skip header row
-          result.push({ en: en, kr: kr });
-        });
+        var result = parseSentencesFromWorkbookData(data);
         if (!result.length){
           showError('엑셀에서 문장을 찾지 못했습니다. A열에 영어 문장, B열에 한글 뜻이 있는지 확인해주세요.');
           setSentenceSet([]);
@@ -987,6 +1093,121 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     };
     reader.readAsArrayBuffer(file);
   });
+
+  // ---------- GitHub repo file browsing ----------
+  (function autoDetectGithub(){
+    try {
+      var host = location.hostname;
+      if (host.indexOf('.github.io') === -1) return; // not on GitHub Pages, leave fields blank
+      var owner = host.split('.')[0];
+      var parts = location.pathname.split('/').filter(Boolean);
+      var repo = parts.length ? parts[0] : '';
+      var folderParts = parts.slice(1);
+      if (folderParts.length && folderParts[folderParts.length - 1].indexOf('.') !== -1){
+        folderParts = folderParts.slice(0, -1); // drop the trailing filename (e.g. index.html)
+      }
+      ghOwnerInput.value = owner;
+      ghRepoInput.value = repo;
+      ghPathInput.value = folderParts.join('/');
+    } catch (err) { /* auto-detect is best-effort; leave fields for manual entry */ }
+  })();
+
+  function setGhFileListContent(html){
+    ghFileList.innerHTML = html;
+    ghFileList.classList.remove('is-hidden');
+  }
+
+  ghListBtn.addEventListener('click', function(){
+    showError('');
+    var owner = ghOwnerInput.value.trim();
+    var repo = ghRepoInput.value.trim();
+    var path = ghPathInput.value.trim().replace(/^\/+|\/+$/g, '');
+    var branch = ghBranchInput.value.trim();
+
+    if (!owner || !repo){
+      ghFileList.classList.add('is-hidden');
+      showError('GitHub 사용자명과 저장소 이름을 입력해주세요.');
+      return;
+    }
+
+    setGhFileListContent('<div class="gh-file-note">불러오는 중...</div>');
+
+    var apiUrl = 'https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/contents';
+    if (path) apiUrl += '/' + path.split('/').map(encodeURIComponent).join('/');
+    if (branch) apiUrl += '?ref=' + encodeURIComponent(branch);
+
+    fetch(apiUrl, { headers: { 'Accept': 'application/vnd.github+json' } })
+      .then(function(res){
+        if (!res.ok){
+          if (res.status === 404) throw new Error('저장소나 폴더를 찾을 수 없습니다. 사용자명·저장소·경로를 확인해주세요.');
+          if (res.status === 403) throw new Error('GitHub API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
+          throw new Error('GitHub에서 파일 목록을 가져오지 못했습니다.');
+        }
+        return res.json();
+      })
+      .then(function(items){
+        if (!Array.isArray(items)){
+          throw new Error('입력한 경로가 폴더가 아닙니다.');
+        }
+        var files = items.filter(function(it){
+          return it.type === 'file' && /\.(xlsx|xls)$/i.test(it.name);
+        });
+        renderGhFileList(files);
+      })
+      .catch(function(err){
+        ghFileList.classList.add('is-hidden');
+        ghFileList.innerHTML = '';
+        showError(err.message || 'GitHub에서 파일 목록을 가져오는 중 오류가 발생했습니다.');
+      });
+  });
+
+  function renderGhFileList(files){
+    if (!files.length){
+      setGhFileListContent('<div class="gh-file-note">이 폴더에서 엑셀 파일(.xlsx, .xls)을 찾지 못했습니다.</div>');
+      return;
+    }
+    ghFileList.innerHTML = '';
+    files.forEach(function(file){
+      var row = document.createElement('div');
+      row.className = 'gh-file-row';
+      row.innerHTML =
+        '<span class="name">' + escapeHtml(file.name) + '</span>' +
+        '<span class="pick">불러오기 →</span>';
+      row.addEventListener('click', function(){
+        loadGhFile(file, row);
+      });
+      ghFileList.appendChild(row);
+    });
+    ghFileList.classList.remove('is-hidden');
+  }
+
+  function loadGhFile(file, row){
+    showError('');
+    var pickLabel = row.querySelector('.pick');
+    if (pickLabel) pickLabel.textContent = '불러오는 중...';
+
+    fetch(file.download_url)
+      .then(function(res){
+        if (!res.ok) throw new Error('파일을 다운로드하지 못했습니다.');
+        return res.arrayBuffer();
+      })
+      .then(function(buf){
+        var data = new Uint8Array(buf);
+        var result = parseSentencesFromWorkbookData(data);
+        if (!result.length){
+          showError('엑셀에서 문장을 찾지 못했습니다. A열에 영어 문장, B열에 한글 뜻이 있는지 확인해주세요.');
+          setSentenceSet([]);
+          return;
+        }
+        setSentenceSet(result);
+      })
+      .catch(function(err){
+        showError(err.message || '파일을 불러오는 중 오류가 발생했습니다.');
+      })
+      .then(function(){
+        if (pickLabel) pickLabel.textContent = '불러오기 →';
+      });
+  }
 
   // ---------- game flow ----------
   startBtn.addEventListener('click', function(){
