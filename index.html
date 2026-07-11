@@ -68,9 +68,15 @@
     gap:24px;
   }
 
+  .game-card-wrap{
+    display:flex;
+    flex-direction:column;
+  }
+
   .game-card{
     display:flex;
     flex-direction:column;
+    flex:1;
     background:var(--paper);
     border:1px solid var(--border);
     border-radius:20px;
@@ -87,6 +93,24 @@
   .game-card:hover .play-pill{
     background:var(--pill-hover, var(--primary-dark));
   }
+
+  .manual-link{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    margin-top:10px;
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--ink-soft);
+    text-decoration:none;
+    padding:8px 10px;
+    border-radius:9px;
+    transition:color .15s ease, background .15s ease;
+  }
+  .game-card-wrap:nth-child(1) .manual-link:hover{ color:var(--primary); background:#EEF1FB; }
+  .game-card-wrap:nth-child(2) .manual-link:hover{ color:var(--success); background:#EEF7EE; }
 
   .game-art{
     height:190px;
@@ -164,6 +188,7 @@
     .game-card h2{ font-size:14.5px; margin-bottom:6px; }
     .game-card p.desc{ display:none; }
     .play-pill{ font-size:12px; padding:9px 6px; border-radius:9px; }
+    .manual-link{ font-size:10.5px; padding:6px 4px; margin-top:6px; }
   }
 </style>
 </head>
@@ -176,6 +201,7 @@
   </header>
 
   <div class="game-grid">
+    <div class="game-card-wrap">
     <a class="game-card sentence-card" href="sentence_card_game.html">
       <div class="game-art sentence-art">
         <svg viewBox="0 0 400 190" xmlns="http://www.w3.org/2000/svg">
@@ -240,7 +266,10 @@
         <span class="play-pill">문장 게임 시작하기 →</span>
       </div>
     </a>
+    <a class="manual-link" href="sentence_card_game_manual.pdf" target="_blank" rel="noopener">📄 사용 설명서 (PDF)</a>
+    </div>
 
+    <div class="game-card-wrap">
     <a class="game-card match-card" href="word_match_game.html">
       <div class="game-art match-art">
         <svg viewBox="0 0 400 190" xmlns="http://www.w3.org/2000/svg">
@@ -287,6 +316,8 @@
         <span class="play-pill">단어 게임 시작하기 →</span>
       </div>
     </a>
+    <a class="manual-link" href="word_match_game_manual.pdf" target="_blank" rel="noopener">📄 사용 설명서 (PDF)</a>
+    </div>
   </div>
 </div>
 </body>
