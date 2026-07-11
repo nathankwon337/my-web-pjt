@@ -148,23 +148,21 @@
   .game-card.match-card .play-pill{ background:var(--success); }
   .game-card:active .play-pill{ transform:scale(0.98); }
 
-  footer.bottom{
-    text-align:center;
-    margin-top:36px;
-    font-size:12.5px;
-    color:var(--ink-soft);
-  }
-  footer.bottom code{
-    background:var(--amber-soft);
-    padding:1px 6px;
-    border-radius:4px;
-    font-family:'Space Grotesk', monospace;
-  }
+  @media (max-width:600px){
+    body{ padding:28px 12px 40px; }
 
-  @media (max-width:720px){
-    .game-grid{ grid-template-columns:1fr; }
-    header.top h1{ font-size:26px; }
-    body{ padding:36px 16px 48px; }
+    header.top{ margin-bottom:24px; }
+    header.top h1{ font-size:22px; }
+    header.top p{ font-size:12.5px; }
+    header.top .eyebrow{ font-size:11px; }
+
+    .game-grid{ gap:10px; }
+    .game-art{ height:92px; }
+    .game-body{ padding:12px 12px 14px; }
+    .game-kicker{ font-size:9.5px; margin-bottom:4px; }
+    .game-card h2{ font-size:14.5px; margin-bottom:6px; }
+    .game-card p.desc{ display:none; }
+    .play-pill{ font-size:12px; padding:9px 6px; border-radius:9px; }
   }
 </style>
 </head>
@@ -289,10 +287,6 @@
       </div>
     </a>
   </div>
-
-  <footer class="bottom">
-    같은 폴더에 <code>sentence_card_game.html</code>과 <code>word_match_game.html</code>이 함께 있어야 링크가 정상적으로 열립니다.
-  </footer>
 </div>
 </body>
 </html>

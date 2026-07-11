@@ -155,8 +155,12 @@
   }
   .goal-badge.over{ background:var(--danger-soft); color:#8E2A38; }
 
-  .match-grid{ display:flex; gap:14px; margin-bottom:20px; }
-  .match-col{ flex:1; display:flex; flex-direction:column; gap:12px; min-width:0; }
+  .match-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px 14px;
+    margin-bottom:20px;
+  }
 
   .match-card{
     position:relative;
@@ -169,6 +173,7 @@
     border-radius:14px;
     padding:16px 10px;
     min-height:60px;
+    height:100%;
     display:flex; align-items:center; justify-content:center; text-align:center;
     cursor:pointer;
     user-select:none;
@@ -176,6 +181,7 @@
     transition:background .15s ease, border-color .15s ease, color .15s ease, transform .1s ease, box-shadow .1s ease, opacity .25s ease;
     overflow:hidden;
     word-break:keep-all;
+    overflow-wrap:break-word;
   }
   .match-card:hover:not(.is-solved):not(.is-selected):not(.is-correct):not(.is-wrong){ border-color:var(--primary); }
   .match-card:active:not(.is-solved){ transform:translateY(3px); box-shadow:0 1px 0 var(--border); }
@@ -260,7 +266,6 @@
     .tab-btn{ flex:1; margin-right:0; text-align:center; padding:10px 2px; font-size:12px; }
     .match-card{ font-size:14px; padding:13px 8px; min-height:52px; border-radius:12px; }
     .match-grid{ gap:8px; }
-    .match-col{ gap:8px; }
     .stats-grid{ flex-direction:column; gap:10px; }
     .stat-item{ width:100%; min-width:0; }
     .setup-actions .primary-btn{ width:100%; }
@@ -397,10 +402,7 @@ bring | 가져오다"></textarea>
       <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%;"></div></div>
     </div>
 
-    <div class="match-grid" id="match-grid">
-      <div class="match-col" id="match-col-left"></div>
-      <div class="match-col" id="match-col-right"></div>
-    </div>
+    <div class="match-grid" id="match-grid"></div>
 
     <div class="controls-row">
       <button class="ghost-btn" id="quit-btn">그만하고 설정으로</button>
@@ -502,8 +504,7 @@ bring | 가져오다"></textarea>
   var goalBadge = document.getElementById('goal-badge');
   var mistakeLabel = document.getElementById('mistake-label');
   var progressFill = document.getElementById('progress-fill');
-  var matchColLeft = document.getElementById('match-col-left');
-  var matchColRight = document.getElementById('match-col-right');
+  var matchGrid = document.getElementById('match-grid');
   var quitBtn = document.getElementById('quit-btn');
 
   var replayBtn = document.getElementById('replay-btn');
@@ -928,14 +929,11 @@ bring | 가져오다"></textarea>
   }
 
   function renderGrid(){
-    matchColLeft.innerHTML = '';
-    leftCards.forEach(function(card){
-      matchColLeft.appendChild(makeMatchCard(card, 'left'));
-    });
-    matchColRight.innerHTML = '';
-    rightCards.forEach(function(card){
-      matchColRight.appendChild(makeMatchCard(card, 'right'));
-    });
+    matchGrid.innerHTML = '';
+    for (var i = 0; i < leftCards.length; i++){
+      matchGrid.appendChild(makeMatchCard(leftCards[i], 'left'));
+      matchGrid.appendChild(makeMatchCard(rightCards[i], 'right'));
+    }
   }
 
   function makeMatchCard(card, side){
