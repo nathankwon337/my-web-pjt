@@ -1,0 +1,1948 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentence card game</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bg:#EEF1F6;
+    --paper:#FFFFFF;
+    --ink:#1E2A44;
+    --ink-soft:#5B6580;
+    --primary:#3A4CA8;
+    --primary-dark:#2C3986;
+    --amber:#E8A33D;
+    --amber-soft:#FBEBD2;
+    --success:#3F9142;
+    --success-soft:#E4F3E3;
+    --danger:#D1495B;
+    --danger-soft:#FBE4E7;
+    --border:#CBD2E3;
+    --slot-empty:#E4E8F2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 1px 1px, #dde2ef 1px, transparent 1px) 0 0/24px 24px,
+      var(--bg);
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    display:flex;
+    justify-content:center;
+    padding:32px 16px 64px;
+  }
+  .app{
+    width:100%;
+    max-width:760px;
+  }
+  header.top{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:24px;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  header.top h1{
+    font-family:'Noto Serif KR', serif;
+    font-weight:700;
+    font-size:26px;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  header.top .subtitle{
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:28px;
+    box-shadow:0 1px 2px rgba(30,42,68,0.04), 0 8px 24px -12px rgba(30,42,68,0.10);
+  }
+
+  /* ---------- setup ---------- */
+  .tabs{
+    display:flex;
+    gap:6px;
+    margin-bottom:20px;
+    border-bottom:1px solid var(--border);
+  }
+  .tab-btn{
+    appearance:none;
+    border:none;
+    background:none;
+    padding:10px 4px;
+    margin-right:20px;
+    font-family:'Inter',sans-serif;
+    font-size:14.5px;
+    font-weight:600;
+    color:var(--ink-soft);
+    cursor:pointer;
+    border-bottom:2px solid transparent;
+    transform:translateY(1px);
+  }
+  .tab-btn.active{
+    color:var(--primary);
+    border-bottom:2px solid var(--primary);
+  }
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
+
+  textarea{
+    width:100%;
+    min-height:160px;
+    font-family:'Space Grotesk', monospace;
+    font-size:14px;
+    line-height:1.6;
+    padding:14px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    resize:vertical;
+    background:#FBFCFE;
+    color:var(--ink);
+  }
+  textarea:focus{outline:2px solid var(--primary); outline-offset:1px;}
+
+  .hint{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin:8px 0 0;
+    line-height:1.6;
+  }
+  .hint code{
+    background:var(--amber-soft);
+    padding:1px 6px;
+    border-radius:4px;
+    font-family:'Space Grotesk', monospace;
+  }
+
+  .file-drop{
+    border:1.5px dashed var(--border);
+    border-radius:12px;
+    padding:28px 16px;
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:13.5px;
+  }
+  .file-drop input{margin-top:12px;}
+
+  .gh-field{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+    flex-wrap:wrap;
+  }
+  .gh-field label{
+    min-width:70px;
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--ink-soft);
+  }
+  .gh-field input{
+    flex:1;
+    min-width:140px;
+    padding:8px 10px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-family:'Space Grotesk', monospace;
+    font-size:13.5px;
+    background:#FBFCFE;
+    color:var(--ink);
+  }
+  .gh-field input:focus{ outline:2px solid var(--primary); outline-offset:1px; }
+
+  .gh-file-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin-top:14px;
+    max-height:220px;
+    overflow-y:auto;
+  }
+  .gh-file-list.is-hidden{ display:none; }
+  .gh-file-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 12px;
+    background:#F5F7FB;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-size:13.5px;
+    cursor:pointer;
+    transition:border-color .12s ease, background .12s ease;
+  }
+  .gh-file-row:hover{ border-color:var(--primary); background:#EEF1FB; }
+  .gh-file-row .name{
+    font-family:'Space Grotesk', monospace;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color:var(--ink);
+  }
+  .gh-file-row .pick{
+    color:var(--primary);
+    font-weight:700;
+    font-size:12.5px;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .gh-file-note{
+    padding:10px 4px;
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+
+  .preview{
+    margin-top:18px;
+    border-top:1px solid var(--border);
+    padding-top:16px;
+  }
+  .preview .count{
+    font-weight:600;
+    font-size:14px;
+    margin-bottom:8px;
+  }
+  .preview .count strong{color:var(--primary);}
+  .preview-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    max-height:140px;
+    overflow-y:auto;
+  }
+  .preview-row{
+    display:flex;
+    gap:10px;
+    font-size:13px;
+    padding:6px 10px;
+    background:#F5F7FB;
+    border-radius:6px;
+  }
+  .preview-row .en{font-family:'Space Grotesk', monospace; flex:1.3; color:var(--ink);}
+  .preview-row .kr{flex:1; color:var(--ink-soft); font-family:'Noto Serif KR', serif;}
+
+  .error-msg{
+    color:var(--danger);
+    font-size:13px;
+    margin-top:10px;
+    font-weight:600;
+  }
+
+  .primary-btn{
+    appearance:none;
+    border:none;
+    background:var(--primary);
+    color:#fff;
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:15px;
+    padding:13px 22px;
+    border-radius:10px;
+    cursor:pointer;
+    transition:background .15s ease, transform .1s ease;
+  }
+  .primary-btn:hover{background:var(--primary-dark);}
+  .primary-btn:active{transform:scale(0.98);}
+  .primary-btn:disabled{background:#B7BEDA; cursor:not-allowed;}
+  .primary-btn:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+
+  .ghost-btn{
+    appearance:none;
+    border:1px solid var(--border);
+    background:#fff;
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    padding:11px 18px;
+    border-radius:10px;
+    cursor:pointer;
+  }
+  .ghost-btn:hover{border-color:var(--primary); color:var(--primary);}
+  .ghost-btn:disabled{color:#B7BEDA; border-color:#E1E5F0; cursor:not-allowed;}
+  .ghost-btn:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+
+  .settings-box{
+    margin-top:22px;
+    padding-top:18px;
+    border-top:1px solid var(--border);
+  }
+  .settings-title{
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    margin-bottom:12px;
+  }
+  .settings-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size:14px;
+    margin-bottom:10px;
+  }
+  .settings-row input[type="checkbox"]{
+    width:16px; height:16px; accent-color:var(--primary);
+  }
+  .settings-row input[type="number"]{
+    width:72px;
+    padding:7px 10px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-family:'Space Grotesk', monospace;
+    font-size:14px;
+  }
+  .settings-row select{
+    padding:7px 10px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-family:'Inter', sans-serif;
+    font-size:13.5px;
+    background:#FBFCFE;
+    color:var(--ink);
+  }
+
+  .setup-actions{
+    margin-top:22px;
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+  }
+
+  /* ---------- game ---------- */
+  .game-top{
+    margin-bottom:18px;
+    font-size:13.5px;
+    color:var(--ink-soft);
+    font-weight:600;
+  }
+  .meta-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    margin-bottom:8px;
+  }
+  .progress-track{
+    width:100%;
+    height:6px;
+    background:var(--slot-empty);
+    border-radius:4px;
+    overflow:hidden;
+  }
+  .progress-fill{
+    height:100%;
+    background:var(--amber);
+    border-radius:4px;
+    transition:width .3s ease;
+  }
+  .score-tag{color:var(--primary); white-space:nowrap;}
+  .timer-badge{
+    display:none;
+    align-items:center;
+    white-space:nowrap;
+    background:var(--amber-soft);
+    color:#8A5A11;
+    padding:4px 10px;
+    border-radius:20px;
+    font-family:'Space Grotesk', monospace;
+    font-weight:700;
+    font-size:13px;
+  }
+  .timer-badge.low{
+    background:var(--danger-soft);
+    color:#8E2A38;
+  }
+
+  .prompt-card{
+    background:linear-gradient(180deg,#FFFDF8, var(--amber-soft));
+    border:1px solid #EAD4A0;
+    border-radius:14px;
+    padding:24px 22px;
+    margin-bottom:26px;
+    position:relative;
+  }
+  .prompt-eyebrow{
+    font-size:11.5px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:#A9762A;
+    font-weight:700;
+    margin-bottom:6px;
+  }
+  .prompt-text{
+    font-family:'Noto Serif KR', serif;
+    font-weight:600;
+    font-size:22px;
+    line-height:1.5;
+    color:#3A2E12;
+  }
+
+  .assembly-label{
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    margin-bottom:6px;
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    flex-wrap:wrap;
+    gap:6px;
+  }
+  .assembly-label .drag-hint{
+    font-size:11.5px;
+    font-weight:500;
+    text-transform:none;
+    color:#98A1BB;
+    letter-spacing:0;
+  }
+  .assembly-strip{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    min-height:58px;
+    padding:12px;
+    background:#F5F7FB;
+    border-radius:12px;
+    margin-bottom:28px;
+    align-content:flex-start;
+  }
+  .slot-empty{
+    width:52px;
+    height:40px;
+    border:1.5px dashed #C3CAE0;
+    border-radius:8px;
+    background:#fff;
+  }
+
+  .word-card{
+    position:relative;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:15px;
+    color:var(--ink);
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:9px 16px 9px 16px;
+    cursor:pointer;
+    box-shadow:0 2px 0 rgba(30,42,68,0.06);
+    transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease, opacity .12s ease;
+    user-select:none;
+    margin-top:6px;
+  }
+  .word-card::before{
+    content:'';
+    position:absolute;
+    top:-6px;
+    left:50%;
+    transform:translateX(-50%);
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:var(--bg);
+    border:1px solid var(--border);
+  }
+  .assembly-strip .word-card::before{background:#F5F7FB;}
+  .word-card:hover{
+    transform:translateY(-2px);
+    border-color:var(--primary);
+    box-shadow:0 4px 8px -2px rgba(58,76,168,0.25);
+  }
+  .word-card.in-answer{
+    background:var(--primary);
+    color:#fff;
+    border-color:var(--primary-dark);
+    cursor:grab;
+    touch-action:none;
+  }
+  .word-card.in-answer::before{
+    background:var(--primary);
+    border-color:#fff;
+  }
+  .word-card.in-answer:hover{
+    background:var(--danger);
+    border-color:var(--danger);
+  }
+  .word-card.drag-source{
+    opacity:0.22;
+  }
+  .word-card.drag-ghost{
+    box-shadow:0 10px 20px -6px rgba(30,42,68,0.35);
+    cursor:grabbing;
+    transform:scale(1.04) rotate(-1.5deg);
+  }
+  body.ck-dragging, body.ck-dragging *{
+    cursor:grabbing !important;
+  }
+
+  .word-card.in-answer.flash-correct{
+    background:var(--success);
+    border-color:#2F7A30;
+    color:#fff;
+    overflow:hidden;
+    animation: cardPopSCG .45s ease;
+  }
+  .word-card.in-answer.flash-correct::before{ background:var(--success); border-color:#fff; }
+  .word-card.in-answer.flash-correct::after{
+    content:'';
+    position:absolute; top:0; left:-60%; width:45%; height:100%;
+    background:linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.85) 50%, transparent 100%);
+    transform:skewX(-20deg);
+    animation: shineSweepSCG .6s ease forwards;
+  }
+  .word-card.in-answer.flash-wrong{
+    background:var(--danger);
+    border-color:#A83345;
+    color:#fff;
+    animation: cardShakeSCG .45s ease;
+  }
+  .word-card.in-answer.flash-wrong::before{ background:var(--danger); border-color:#fff; }
+
+  @keyframes cardPopSCG{
+    0%{ transform:scale(1); }
+    35%{ transform:scale(1.07); }
+    65%{ transform:scale(0.97); }
+    100%{ transform:scale(1); }
+  }
+  @keyframes shineSweepSCG{
+    0%{ left:-60%; }
+    100%{ left:130%; }
+  }
+  @keyframes cardShakeSCG{
+    0%,100%{ transform:translateX(0); }
+    15%{ transform:translateX(-7px); }
+    30%{ transform:translateX(6px); }
+    45%{ transform:translateX(-5px); }
+    60%{ transform:translateX(4px); }
+    75%{ transform:translateX(-2px); }
+  }
+
+  .word-bank{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-bottom:24px;
+    min-height:48px;
+  }
+
+  .controls-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .controls-row .left-group, .controls-row .right-group{
+    display:flex;
+    gap:10px;
+  }
+
+  .feedback{
+    margin-top:20px;
+    padding:16px 18px;
+    border-radius:12px;
+    font-size:14.5px;
+    line-height:1.6;
+  }
+  .feedback.correct{background:var(--success-soft); color:#245A27; border:1px solid #BFE2BD;}
+  .feedback.wrong{background:var(--danger-soft); color:#7E2532; border:1px solid #F3C1CA;}
+  .feedback .headline{font-weight:700; font-size:15.5px; margin-bottom:4px; font-family:'Noto Serif KR', serif;}
+  .feedback .answer-line{font-family:'Space Grotesk', monospace; font-size:14px; margin-top:6px;}
+  .feedback-actions{margin-top:14px; display:flex; gap:10px;}
+
+  /* ---------- done ---------- */
+  .done-wrap{text-align:center; padding:20px 4px;}
+  .done-wrap .big-score{
+    font-family:'Noto Serif KR', serif;
+    font-size:44px;
+    font-weight:700;
+    color:var(--primary);
+    margin:10px 0 4px;
+  }
+  .done-wrap .big-score span{font-size:22px; color:var(--ink-soft); font-weight:600;}
+  .stats-grid{
+    display:flex;
+    justify-content:center;
+    gap:14px;
+    margin:20px 0 6px;
+    flex-wrap:wrap;
+  }
+  .stat-item{
+    background:#F5F7FB;
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px 22px;
+    min-width:150px;
+  }
+  .stat-label{
+    font-size:12px;
+    color:var(--ink-soft);
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  .stat-value{
+    font-family:'Space Grotesk', monospace;
+    font-size:22px;
+    font-weight:700;
+    color:var(--primary);
+  }
+  .done-actions{margin-top:24px; display:flex; gap:10px; justify-content:center;}
+
+  .highlight-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    max-width:420px;
+    margin:18px auto 0;
+    text-align:left;
+  }
+  .highlight-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:#F5F7FB;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:10px 14px;
+    font-size:13.5px;
+  }
+  .highlight-row .emoji{font-size:18px; flex-shrink:0;}
+  .highlight-row .en{
+    font-family:'Space Grotesk', monospace;
+    color:var(--ink);
+    flex:1;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .highlight-row .secs{
+    font-family:'Space Grotesk', monospace;
+    font-weight:700;
+    color:var(--primary);
+    white-space:nowrap;
+  }
+
+  .compare-box{
+    max-width:420px;
+    margin:14px auto 0;
+    background:var(--amber-soft);
+    border:1px solid #EAD4A0;
+    border-radius:12px;
+    padding:14px 16px;
+    font-size:13.5px;
+    color:#5C4210;
+    text-align:left;
+    line-height:1.7;
+  }
+  .compare-box .compare-title{
+    font-weight:700;
+    margin-bottom:4px;
+    font-family:'Noto Serif KR', serif;
+  }
+
+  @media (max-width:600px){
+    body{ padding:20px 12px 48px; }
+    .panel{ padding:18px; border-radius:14px; }
+
+    header.top{ flex-direction:column; align-items:flex-start; gap:4px; margin-bottom:18px; }
+    header.top h1{ font-size:22px; }
+    header.top .subtitle{ font-size:12px; }
+
+    .tabs{ gap:0; }
+    .tab-btn{ flex:1; margin-right:0; text-align:center; padding:10px 2px; font-size:12px; }
+
+    .prompt-card{ padding:18px 16px; }
+    .prompt-text{ font-size:18px; }
+
+    .assembly-label{ font-size:11.5px; }
+    .assembly-label .drag-hint{ font-size:11px; }
+    .assembly-strip, .word-bank{ gap:8px; }
+
+    .word-card{
+      font-size:14.5px;
+      padding:11px 15px;
+      min-height:40px;
+      display:inline-flex;
+      align-items:center;
+    }
+
+    .controls-row{ flex-direction:column; align-items:stretch; gap:8px; }
+    .controls-row .left-group{ flex-direction:column; width:100%; }
+    .controls-row .right-group{ width:100%; }
+    .controls-row button{ width:100%; }
+
+    .feedback-actions{ flex-direction:column; }
+    .feedback-actions button{ width:100%; }
+
+    .setup-actions{ justify-content:stretch; }
+    .setup-actions .primary-btn{ width:100%; }
+
+    .stats-grid{ flex-direction:column; gap:10px; }
+    .stat-item{ width:100%; min-width:0; }
+
+    .highlight-list, .compare-box{ max-width:100%; }
+
+    .settings-row{ flex-wrap:wrap; }
+
+    /* While actually playing, lock the game to one screen (no page scroll). */
+    body.in-game{
+      height:100vh;
+      height:100dvh;
+      overflow:hidden;
+      padding:0;
+    }
+    body.in-game .app{
+      height:100%;
+      max-width:100%;
+      display:flex;
+      flex-direction:column;
+    }
+    body.in-game header.top{ display:none; }
+    body.in-game #game-panel{
+      flex:1;
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+      padding:12px 14px;
+      border-radius:0;
+      box-shadow:none;
+      overflow:hidden;
+    }
+    body.in-game #game-panel .game-top{ flex-shrink:0; margin-bottom:8px; }
+    body.in-game #game-panel .prompt-card{
+      flex-shrink:0;
+      padding:12px 14px;
+      margin-bottom:10px;
+      max-height:16vh;
+      overflow-y:auto;
+    }
+    body.in-game #game-panel .prompt-text{ font-size:15.5px; line-height:1.4; }
+    body.in-game #game-panel .assembly-label{ flex-shrink:0; margin-bottom:4px; }
+    body.in-game #game-panel .assembly-label .drag-hint{ display:none; }
+    body.in-game #game-panel .assembly-strip{
+      flex-shrink:0;
+      max-height:46vh;
+      overflow-y:auto;
+      margin-bottom:8px;
+    }
+    body.in-game #game-panel .word-bank{
+      flex:1;
+      min-height:56px;
+      overflow-y:auto;
+      align-content:flex-start;
+      margin-bottom:10px;
+    }
+    body.in-game #game-panel .controls-row{ flex-shrink:0; gap:6px; }
+    body.in-game #game-panel .controls-row button{ padding:10px 16px; font-size:14px; }
+    body.in-game #game-panel .feedback{
+      position:fixed;
+      left:0; right:0; bottom:0;
+      margin:0;
+      max-height:48vh;
+      overflow-y:auto;
+      border-radius:16px 16px 0 0;
+      box-shadow:0 -10px 28px rgba(30,42,68,0.22);
+      z-index:500;
+    }
+  }
+
+  @media (max-width:380px){
+    header.top h1{ font-size:20px; }
+    .prompt-text{ font-size:16.5px; }
+    .big-score{ font-size:36px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>Sentence card game</h1>
+    <div class="subtitle">뜻을 보고 외국어 단어 카드를 순서대로 골라보세요</div>
+  </header>
+
+  <!-- SETUP -->
+  <section class="panel" id="setup-panel">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="text">텍스트로 입력</button>
+      <button class="tab-btn" data-tab="excel">엑셀 업로드</button>
+      <button class="tab-btn" data-tab="github">깃허브에서 불러오기</button>
+    </div>
+
+    <div class="tab-content active" id="tab-text">
+      <textarea id="text-input" placeholder="I go to school every morning. | 나는 매일 아침 학교에 간다.
+She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea>
+      <p class="hint">한 줄에 문장 하나씩 입력하세요. 외국어 문장과 한글 뜻은 <code>|</code> 기호 또는 탭(Tab)으로 구분합니다. 엑셀에서 두 칸을 복사해 붙여넣어도 자동으로 인식됩니다.</p>
+      <div style="margin-top:14px;">
+        <button class="ghost-btn" id="parse-text-btn">문장 목록 불러오기</button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-excel">
+      <div class="file-drop">
+        엑셀 파일(.xlsx, .xls)을 선택하세요<br>
+        <span style="font-size:12px;">A열: 외국어 문장 &nbsp;·&nbsp; B열: 한글 뜻 (제목 줄이 있어도 자동으로 건너뜁니다)</span><br>
+        <input type="file" id="excel-input" accept=".xlsx,.xls">
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-github">
+      <div class="gh-field">
+        <label for="gh-owner">사용자/조직</label>
+        <input type="text" id="gh-owner" placeholder="예: myid">
+      </div>
+      <div class="gh-field">
+        <label for="gh-repo">저장소</label>
+        <input type="text" id="gh-repo" placeholder="예: my-repo">
+      </div>
+      <div class="gh-field">
+        <label for="gh-path">폴더 경로</label>
+        <input type="text" id="gh-path" placeholder="비워두면 저장소 최상위 폴더">
+      </div>
+      <div class="gh-field">
+        <label for="gh-branch">브랜치</label>
+        <input type="text" id="gh-branch" placeholder="비워두면 기본 브랜치 사용">
+      </div>
+      <p class="hint">공개(public) 저장소만 지원합니다. 이 페이지가 GitHub Pages(*.github.io)에서 열려 있다면 사용자·저장소·폴더를 자동으로 채워봅니다 (필요하면 직접 수정하세요).</p>
+      <div style="margin-top:10px;">
+        <button class="ghost-btn" id="gh-list-btn">엑셀 파일 목록 불러오기</button>
+      </div>
+      <div id="gh-file-list" class="gh-file-list is-hidden"></div>
+    </div>
+
+    <div id="parse-error" class="error-msg" style="display:none;"></div>
+
+    <div class="preview" id="preview-wrap" style="display:none;">
+      <div class="count">불러온 문장: <strong id="preview-count">0</strong>개</div>
+      <div class="preview-list" id="preview-list"></div>
+    </div>
+
+    <div class="settings-box">
+      <div class="settings-title">게임 설정</div>
+      <label class="settings-row">
+        <input type="checkbox" id="timer-enable">
+        문장별 제한 시간 사용하기
+      </label>
+      <div class="settings-row" id="timer-seconds-row" style="display:none;">
+        <label for="timer-seconds">제한 시간</label>
+        <input type="number" id="timer-seconds" min="5" max="300" value="30">
+        <span>초 &nbsp;(시간 안에 못 맞추면 오답 처리됩니다)</span>
+      </div>
+
+      <label class="settings-row">
+        <input type="checkbox" id="pronounce-enable" checked>
+        단어 카드 선택 시 발음 재생하기
+      </label>
+      <div class="settings-row" id="pronounce-lang-row">
+        <label for="pronounce-lang">발음 언어</label>
+        <select id="pronounce-lang">
+          <option value="en-US">영어 (미국)</option>
+          <option value="en-GB">영어 (영국)</option>
+          <option value="de-DE">독일어</option>
+          <option value="ja-JP">일본어</option>
+          <option value="zh-CN">중국어 (간체)</option>
+          <option value="fr-FR">프랑스어</option>
+          <option value="es-ES">스페인어</option>
+          <option value="it-IT">이탈리아어</option>
+          <option value="ru-RU">러시아어</option>
+          <option value="pt-BR">포르투갈어 (브라질)</option>
+          <option value="vi-VN">베트남어</option>
+          <option value="th-TH">태국어</option>
+          <option value="id-ID">인도네시아어</option>
+          <option value="ko-KR">한국어</option>
+        </select>
+        <button class="ghost-btn" id="pronounce-test-btn" type="button">발음 테스트</button>
+      </div>
+      <p class="hint">브라우저/기기에 설치된 음성 엔진을 사용해요. 단어 카드를 선택해 문장에 넣을 때마다 그 단어를 읽어줍니다.</p>
+
+      <label class="settings-row">
+        <input type="checkbox" id="sound-enable" checked>
+        정답/오답 효과음 재생하기
+      </label>
+      <div class="settings-row">
+        <button class="ghost-btn" id="sound-test-btn" type="button">효과음 테스트</button>
+      </div>
+    </div>
+
+    <div class="setup-actions">
+      <button class="primary-btn" id="start-btn" disabled>게임 시작하기</button>
+    </div>
+  </section>
+
+  <!-- GAME -->
+  <section class="panel" id="game-panel" style="display:none;">
+    <div class="game-top">
+      <div class="meta-row">
+        <span id="progress-label">1 / 10</span>
+        <span class="timer-badge" id="timer-badge">⏱ 30초</span>
+        <span class="score-tag" id="score-label">점수 0</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%;"></div></div>
+    </div>
+
+    <div class="prompt-card">
+      <div class="prompt-eyebrow">이 뜻에 맞는 문장을 완성하세요</div>
+      <div class="prompt-text" id="prompt-text">-</div>
+    </div>
+
+    <div class="assembly-label">
+      <span>완성한 문장</span>
+      <span class="drag-hint">카드를 드래그해서 순서를 바꾸거나, 클릭하면 다시 뺄 수 있어요</span>
+    </div>
+    <div class="assembly-strip" id="assembly-strip"></div>
+
+    <div class="assembly-label"><span>단어 카드</span></div>
+    <div class="word-bank" id="word-bank"></div>
+
+    <div class="controls-row">
+      <div class="left-group">
+        <button class="primary-btn" id="check-btn" disabled>정답 확인</button>
+        <button class="ghost-btn" id="reset-btn">카드 초기화</button>
+      </div>
+      <div class="right-group">
+        <button class="ghost-btn" id="quit-btn">그만하고 설정으로</button>
+      </div>
+    </div>
+
+    <div class="feedback" id="feedback" style="display:none;"></div>
+  </section>
+
+  <!-- DONE -->
+  <section class="panel done-wrap" id="done-panel" style="display:none;">
+    <div class="assembly-label" style="text-align:center; display:block;">학습 완료</div>
+    <div class="big-score"><span id="final-score">0</span> <span>/ <span id="final-total">0</span> 문장 정답</span></div>
+
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-label">총 소요 시간</div>
+        <div class="stat-value" id="stat-total-time">0:00</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">문장당 평균 시간</div>
+        <div class="stat-value" id="stat-avg-time">0.0초</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">최다 정답 Combo</div>
+        <div class="stat-value" id="stat-streak">0 Combo</div>
+      </div>
+    </div>
+
+    <div class="highlight-list" id="highlight-list"></div>
+    <div class="compare-box" id="compare-box" style="display:none;"></div>
+
+    <p style="color:var(--ink-soft); font-size:14px;">같은 문장 세트로 다시 연습하거나, 새로운 문장을 입력해보세요.</p>
+    <div class="done-actions">
+      <button class="primary-btn" id="replay-btn">같은 문장으로 다시하기</button>
+      <button class="ghost-btn" id="new-set-btn">새 문장 입력하기</button>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var sentenceSet = [];   // {en, kr}
+  var order = [];         // shuffled indices into sentenceSet for this play session
+  var currentPos = 0;
+  var score = 0;
+  var bank = [];           // [{id, text}]
+  var answer = [];         // [{id, text}]
+  var wordCount = 0;
+  var awaitingNext = false;
+
+  var timerEnabled = false;
+  var timerSecondsLimit = 30;
+  var timerInterval = null;
+  var remainingSeconds = 0;
+
+  var pronounceEnabled = true;
+  var pronounceLang = 'en-US';
+  var soundEnabled = true;
+
+  var sentenceActiveMs = 0;   // active solving time accumulated for the current sentence (ms)
+  var activeSince = 0;        // timestamp when the active period started, 0 while paused
+  var timePerSentence = [];   // seconds of active solving time per sentence, recorded when moving on
+  var sentenceResults = [];   // [{en, kr, seconds, correct}] per sentence, for fastest/slowest highlight
+  var currentSentenceCorrect = false;
+  var currentStreak = 0;
+  var bestStreak = 0;
+  var previousRunStats = null; // stats from the last time this same sentence set was played, for comparison
+
+  var dragging = null; // active pointer-drag state, see onCardPointerDown
+
+  // ---------- element refs ----------
+  var setupPanel = document.getElementById('setup-panel');
+  var gamePanel = document.getElementById('game-panel');
+  var donePanel = document.getElementById('done-panel');
+
+  var textInput = document.getElementById('text-input');
+  var excelInput = document.getElementById('excel-input');
+  var parseTextBtn = document.getElementById('parse-text-btn');
+  var parseError = document.getElementById('parse-error');
+  var previewWrap = document.getElementById('preview-wrap');
+  var previewCount = document.getElementById('preview-count');
+  var previewList = document.getElementById('preview-list');
+  var startBtn = document.getElementById('start-btn');
+
+  var ghOwnerInput = document.getElementById('gh-owner');
+  var ghRepoInput = document.getElementById('gh-repo');
+  var ghPathInput = document.getElementById('gh-path');
+  var ghBranchInput = document.getElementById('gh-branch');
+  var ghListBtn = document.getElementById('gh-list-btn');
+  var ghFileList = document.getElementById('gh-file-list');
+
+  var timerEnableCb = document.getElementById('timer-enable');
+  var timerSecondsRow = document.getElementById('timer-seconds-row');
+  var timerSecondsInput = document.getElementById('timer-seconds');
+
+  var pronounceEnableCb = document.getElementById('pronounce-enable');
+  var pronounceLangSelect = document.getElementById('pronounce-lang');
+  var pronounceTestBtn = document.getElementById('pronounce-test-btn');
+
+  var soundEnableCb = document.getElementById('sound-enable');
+  var soundTestBtn = document.getElementById('sound-test-btn');
+
+  var progressLabel = document.getElementById('progress-label');
+  var progressFill = document.getElementById('progress-fill');
+  var scoreLabel = document.getElementById('score-label');
+  var timerBadge = document.getElementById('timer-badge');
+  var promptText = document.getElementById('prompt-text');
+  var assemblyStrip = document.getElementById('assembly-strip');
+  var wordBankEl = document.getElementById('word-bank');
+  var checkBtn = document.getElementById('check-btn');
+  var resetBtn = document.getElementById('reset-btn');
+  var quitBtn = document.getElementById('quit-btn');
+  var feedbackEl = document.getElementById('feedback');
+
+  var replayBtn = document.getElementById('replay-btn');
+  var newSetBtn = document.getElementById('new-set-btn');
+  var finalScore = document.getElementById('final-score');
+  var finalTotal = document.getElementById('final-total');
+  var statTotalTime = document.getElementById('stat-total-time');
+  var statAvgTime = document.getElementById('stat-avg-time');
+  var statStreak = document.getElementById('stat-streak');
+  var highlightList = document.getElementById('highlight-list');
+  var compareBox = document.getElementById('compare-box');
+
+  // ---------- tabs ----------
+  document.querySelectorAll('.tab-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+      document.querySelectorAll('.tab-content').forEach(function(c){ c.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  timerEnableCb.addEventListener('change', function(){
+    timerSecondsRow.style.display = timerEnableCb.checked ? 'flex' : 'none';
+  });
+
+  // ---------- pronunciation (Web Speech API) ----------
+  function doSpeak(text, lang){
+    if (!('speechSynthesis' in window)) return false;
+    try {
+      window.speechSynthesis.cancel(); // stop any word still being read
+      var utter = new SpeechSynthesisUtterance(text);
+      utter.lang = lang;
+      utter.rate = 0.92;
+      window.speechSynthesis.speak(utter);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function speakWord(text){
+    if (!pronounceEnabled) return;
+    doSpeak(text, pronounceLang);
+  }
+
+  pronounceTestBtn.addEventListener('click', function(){
+    var lang = pronounceLangSelect.value;
+    showError('');
+    var ok = doSpeak('Hello, this is a pronunciation test.', lang);
+    if (!ok){
+      showError('이 브라우저는 음성 재생(Web Speech API)을 지원하지 않습니다.');
+    }
+  });
+
+  // ---------- sound effects (Web Audio API synth, no audio files needed) ----------
+  var audioCtx = null;
+  function getAudioCtx(){
+    if (!audioCtx){
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch (err) { audioCtx = null; }
+    }
+    if (audioCtx && audioCtx.state === 'suspended'){
+      audioCtx.resume();
+    }
+    return audioCtx;
+  }
+
+  function playTone(ctx, freq, startOffset, duration, type, peakGain){
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    var t0 = ctx.currentTime + startOffset;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(peakGain, t0 + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.03);
+  }
+
+  // A bright, bell-like note: fundamental tone plus a quieter octave-up overtone.
+  function playBellNote(ctx, freq, startOffset, duration, peakGain){
+    playTone(ctx, freq, startOffset, duration, 'sine', peakGain);
+    playTone(ctx, freq * 2, startOffset, duration * 0.55, 'sine', peakGain * 0.35);
+    playTone(ctx, freq * 3, startOffset, duration * 0.35, 'triangle', peakGain * 0.12);
+  }
+
+  function playCorrectSound(){
+    if (!soundEnabled) return;
+    var ctx = getAudioCtx();
+    if (!ctx) return;
+    // cheerful ascending major arpeggio ("띵동!" chime)
+    playBellNote(ctx, 1046.50, 0.00, 0.16, 0.26); // C6
+    playBellNote(ctx, 1318.51, 0.08, 0.16, 0.26); // E6
+    playBellNote(ctx, 1567.98, 0.16, 0.30, 0.30); // G6
+  }
+
+  function playWrongSound(){
+    if (!soundEnabled) return;
+    var ctx = getAudioCtx();
+    if (!ctx) return;
+    playTone(ctx, 180, 0, 0.30, 'sawtooth', 0.16);
+    playTone(ctx, 170, 0, 0.30, 'square', 0.10); // slightly detuned for a dissonant buzz
+  }
+
+  soundTestBtn.addEventListener('click', function(){
+    var ctx = getAudioCtx();
+    if (!ctx){
+      showError('이 브라우저는 효과음 재생(Web Audio API)을 지원하지 않습니다.');
+      return;
+    }
+    showError('');
+    playCorrectSound();
+    setTimeout(playWrongSound, 650);
+  });
+
+  // Briefly flashes all placed word cards green (correct) or red+shake (wrong).
+  function flashAssemblyCards(kind, duration){
+    var cards = assemblyStrip.querySelectorAll('.word-card.in-answer');
+    cards.forEach(function(el){ el.classList.add('flash-' + kind); });
+    setTimeout(function(){
+      cards.forEach(function(el){ el.classList.remove('flash-' + kind); });
+    }, duration);
+  }
+
+  // ---------- helpers ----------
+  function shuffle(arr){
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+
+  function showError(msg){
+    parseError.textContent = msg;
+    parseError.style.display = msg ? 'block' : 'none';
+  }
+
+  function escapeHtml(str){
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function formatMinSec(totalSeconds){
+    var s = Math.round(totalSeconds);
+    var m = Math.floor(s / 60);
+    var r = s % 60;
+    return m + ':' + (r < 10 ? '0' : '') + r;
+  }
+
+  function nextButtonLabel(){
+    return (currentPos >= order.length - 1) ? '결과 확인' : '다음 문장 →';
+  }
+
+  function setSentenceSet(list){
+    sentenceSet = list;
+    previousRunStats = null; // a fresh sentence set starts a new comparison baseline
+    if (!list.length){
+      previewWrap.style.display = 'none';
+      startBtn.disabled = true;
+      return;
+    }
+    previewWrap.style.display = 'block';
+    previewCount.textContent = list.length;
+    previewList.innerHTML = '';
+    list.slice(0, 8).forEach(function(s){
+      var row = document.createElement('div');
+      row.className = 'preview-row';
+      row.innerHTML = '<div class="en">' + escapeHtml(s.en) + '</div><div class="kr">' + escapeHtml(s.kr) + '</div>';
+      previewList.appendChild(row);
+    });
+    if (list.length > 8){
+      var more = document.createElement('div');
+      more.style.fontSize = '12px';
+      more.style.color = 'var(--ink-soft)';
+      more.textContent = '... 외 ' + (list.length - 8) + '개';
+      previewList.appendChild(more);
+    }
+    startBtn.disabled = false;
+  }
+
+  // ---------- text parsing ----------
+  parseTextBtn.addEventListener('click', function(){
+    showError('');
+    var lines = textInput.value.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean);
+    if (!lines.length){
+      showError('입력된 문장이 없습니다.');
+      setSentenceSet([]);
+      return;
+    }
+    var result = [];
+    var failed = 0;
+    lines.forEach(function(line){
+      var parts = null;
+      if (line.indexOf('\t') !== -1){
+        parts = line.split('\t');
+      } else if (line.indexOf('|') !== -1){
+        parts = line.split('|');
+      }
+      if (!parts || parts.length < 2){
+        failed++;
+        return;
+      }
+      var en = parts[0].trim();
+      var kr = parts.slice(1).join('|').trim();
+      if (en && kr) result.push({ en: en, kr: kr });
+    });
+    if (!result.length){
+      showError('문장을 인식하지 못했습니다. "외국어 문장 | 한글 뜻" 형식으로 입력했는지 확인해주세요.');
+      setSentenceSet([]);
+      return;
+    }
+    if (failed > 0){
+      showError(failed + '개 줄은 형식이 맞지 않아 제외되었습니다.');
+    }
+    setSentenceSet(result);
+  });
+
+  // ---------- excel parsing (shared by local upload and GitHub loading) ----------
+  function parseSentencesFromWorkbookData(data){
+    var wb = XLSX.read(data, { type: 'array' });
+    var sheet = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    var result = [];
+    rows.forEach(function(row){
+      var en = (row[0] !== undefined ? String(row[0]) : '').trim();
+      var kr = (row[1] !== undefined ? String(row[1]) : '').trim();
+      if (!en || !kr) return;
+      if (/^(english|foreign|sentence|외국어|외국어문장|영어|영어문장|문장)$/i.test(en)) return; // skip header row
+      result.push({ en: en, kr: kr });
+    });
+    return result;
+  }
+
+  excelInput.addEventListener('change', function(e){
+    showError('');
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(evt){
+      try {
+        var data = new Uint8Array(evt.target.result);
+        var result = parseSentencesFromWorkbookData(data);
+        if (!result.length){
+          showError('엑셀에서 문장을 찾지 못했습니다. A열에 외국어 문장, B열에 한글 뜻이 있는지 확인해주세요.');
+          setSentenceSet([]);
+          return;
+        }
+        setSentenceSet(result);
+      } catch (err){
+        showError('엑셀 파일을 읽는 중 오류가 발생했습니다.');
+        setSentenceSet([]);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // ---------- GitHub repo file browsing ----------
+  (function autoDetectGithub(){
+    try {
+      var host = location.hostname;
+      if (host.indexOf('.github.io') === -1) return; // not on GitHub Pages, leave fields blank
+      var owner = host.split('.')[0];
+      var parts = location.pathname.split('/').filter(Boolean);
+      var repo = parts.length ? parts[0] : '';
+      var folderParts = parts.slice(1);
+      if (folderParts.length && folderParts[folderParts.length - 1].indexOf('.') !== -1){
+        folderParts = folderParts.slice(0, -1); // drop the trailing filename (e.g. index.html)
+      }
+      ghOwnerInput.value = owner;
+      ghRepoInput.value = repo;
+      ghPathInput.value = folderParts.join('/');
+    } catch (err) { /* auto-detect is best-effort; leave fields for manual entry */ }
+  })();
+
+  function setGhFileListContent(html){
+    ghFileList.innerHTML = html;
+    ghFileList.classList.remove('is-hidden');
+  }
+
+  ghListBtn.addEventListener('click', function(){
+    showError('');
+    var owner = ghOwnerInput.value.trim();
+    var repo = ghRepoInput.value.trim();
+    var path = ghPathInput.value.trim().replace(/^\/+|\/+$/g, '');
+    var branch = ghBranchInput.value.trim();
+
+    if (!owner || !repo){
+      ghFileList.classList.add('is-hidden');
+      showError('GitHub 사용자명과 저장소 이름을 입력해주세요.');
+      return;
+    }
+
+    setGhFileListContent('<div class="gh-file-note">불러오는 중...</div>');
+
+    var apiUrl = 'https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/contents';
+    if (path) apiUrl += '/' + path.split('/').map(encodeURIComponent).join('/');
+    if (branch) apiUrl += '?ref=' + encodeURIComponent(branch);
+
+    fetch(apiUrl, { headers: { 'Accept': 'application/vnd.github+json' } })
+      .then(function(res){
+        if (!res.ok){
+          if (res.status === 404) throw new Error('저장소나 폴더를 찾을 수 없습니다. 사용자명·저장소·경로를 확인해주세요.');
+          if (res.status === 403) throw new Error('GitHub API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
+          throw new Error('GitHub에서 파일 목록을 가져오지 못했습니다.');
+        }
+        return res.json();
+      })
+      .then(function(items){
+        if (!Array.isArray(items)){
+          throw new Error('입력한 경로가 폴더가 아닙니다.');
+        }
+        var files = items.filter(function(it){
+          return it.type === 'file' && /\.(xlsx|xls)$/i.test(it.name);
+        });
+        renderGhFileList(files);
+      })
+      .catch(function(err){
+        ghFileList.classList.add('is-hidden');
+        ghFileList.innerHTML = '';
+        showError(err.message || 'GitHub에서 파일 목록을 가져오는 중 오류가 발생했습니다.');
+      });
+  });
+
+  function renderGhFileList(files){
+    if (!files.length){
+      setGhFileListContent('<div class="gh-file-note">이 폴더에서 엑셀 파일(.xlsx, .xls)을 찾지 못했습니다.</div>');
+      return;
+    }
+    ghFileList.innerHTML = '';
+    files.forEach(function(file){
+      var row = document.createElement('div');
+      row.className = 'gh-file-row';
+      row.innerHTML =
+        '<span class="name">' + escapeHtml(file.name) + '</span>' +
+        '<span class="pick">불러오기 →</span>';
+      row.addEventListener('click', function(){
+        loadGhFile(file, row);
+      });
+      ghFileList.appendChild(row);
+    });
+    ghFileList.classList.remove('is-hidden');
+  }
+
+  function loadGhFile(file, row){
+    showError('');
+    var pickLabel = row.querySelector('.pick');
+    if (pickLabel) pickLabel.textContent = '불러오는 중...';
+
+    fetch(file.download_url)
+      .then(function(res){
+        if (!res.ok) throw new Error('파일을 다운로드하지 못했습니다.');
+        return res.arrayBuffer();
+      })
+      .then(function(buf){
+        var data = new Uint8Array(buf);
+        var result = parseSentencesFromWorkbookData(data);
+        if (!result.length){
+          showError('엑셀에서 문장을 찾지 못했습니다. A열에 외국어 문장, B열에 한글 뜻이 있는지 확인해주세요.');
+          setSentenceSet([]);
+          return;
+        }
+        setSentenceSet(result);
+      })
+      .catch(function(err){
+        showError(err.message || '파일을 불러오는 중 오류가 발생했습니다.');
+      })
+      .then(function(){
+        if (pickLabel) pickLabel.textContent = '불러오기 →';
+      });
+  }
+
+  // ---------- game flow ----------
+  startBtn.addEventListener('click', function(){
+    if (!sentenceSet.length) return;
+    startGame();
+  });
+
+  function startGame(){
+    timerEnabled = timerEnableCb.checked;
+    timerSecondsLimit = parseInt(timerSecondsInput.value, 10) || 30;
+    pronounceEnabled = pronounceEnableCb.checked;
+    pronounceLang = pronounceLangSelect.value;
+    soundEnabled = soundEnableCb.checked;
+
+    order = shuffle(sentenceSet.map(function(_, i){ return i; }));
+    currentPos = 0;
+    score = 0;
+    timePerSentence = [];
+    sentenceResults = [];
+    currentStreak = 0;
+    bestStreak = 0;
+    setupPanel.style.display = 'none';
+    donePanel.style.display = 'none';
+    gamePanel.style.display = 'block';
+    document.body.classList.add('in-game');
+    loadSentence();
+  }
+
+  function loadSentence(){
+    awaitingNext = false;
+    currentSentenceCorrect = false;
+    feedbackEl.style.display = 'none';
+    feedbackEl.className = 'feedback';
+    var sentence = sentenceSet[order[currentPos]];
+    var words = sentence.en.trim().split(/\s+/);
+    wordCount = words.length;
+    var tokens = words.map(function(w, i){ return { id: 'w' + i + '_' + Math.random().toString(36).slice(2), text: w }; });
+
+    var shuffled = shuffle(tokens);
+    if (words.length > 1){
+      var tries = 0;
+      while (shuffled.map(function(t){ return t.text; }).join(' ') === words.join(' ') && tries < 10){
+        shuffled = shuffle(tokens);
+        tries++;
+      }
+    }
+    bank = shuffled;
+    answer = [];
+
+    promptText.textContent = sentence.kr;
+    progressLabel.textContent = (currentPos + 1) + ' / ' + order.length;
+    progressFill.style.width = Math.round((currentPos / order.length) * 100) + '%';
+    scoreLabel.textContent = '점수 ' + score;
+
+    sentenceActiveMs = 0;
+    resumeActiveTimer();
+    render();
+    startTimer();
+  }
+
+  // ---------- timer ----------
+  function startTimer(){
+    clearInterval(timerInterval);
+    if (!timerEnabled){
+      timerBadge.style.display = 'none';
+      return;
+    }
+    remainingSeconds = timerSecondsLimit;
+    timerBadge.style.display = 'inline-flex';
+    updateTimerBadge();
+    timerInterval = setInterval(function(){
+      remainingSeconds--;
+      updateTimerBadge();
+      if (remainingSeconds <= 0){
+        clearInterval(timerInterval);
+        handleTimeout();
+      }
+    }, 1000);
+  }
+
+  function updateTimerBadge(){
+    timerBadge.textContent = '⏱ ' + Math.max(remainingSeconds, 0) + '초';
+    timerBadge.classList.toggle('low', remainingSeconds <= 5);
+  }
+
+  function stopTimer(){
+    clearInterval(timerInterval);
+  }
+
+  // Active-time tracking for stats: counts only time spent arranging cards,
+  // not time spent reading feedback or deciding whether to retry.
+  function pauseActiveTimer(){
+    if (activeSince){
+      sentenceActiveMs += Date.now() - activeSince;
+      activeSince = 0;
+    }
+  }
+  function resumeActiveTimer(){
+    activeSince = Date.now();
+  }
+
+  function handleTimeout(){
+    if (awaitingNext) return;
+    awaitingNext = true;
+    pauseActiveTimer();
+    var sentence = sentenceSet[order[currentPos]];
+    var correctWords = sentence.en.trim().split(/\s+/);
+    var correctSentence = correctWords.join(' ');
+    var userSentence = answer.map(function(t){ return t.text; }).join(' ');
+    var isCorrect = answer.length === wordCount && userSentence === correctSentence;
+    currentSentenceCorrect = isCorrect;
+
+    if (isCorrect){
+      score++;
+      scoreLabel.textContent = '점수 ' + score;
+      feedbackEl.className = 'feedback correct';
+      feedbackEl.innerHTML =
+        '<div class="headline">시간은 다 됐지만 정답이었어요! 🎉</div>' +
+        '<div>' + escapeHtml(correctSentence) + '</div>' +
+        '<div class="feedback-actions"><button class="primary-btn" id="next-btn">' + nextButtonLabel() + '</button></div>';
+    } else {
+      feedbackEl.className = 'feedback wrong';
+      feedbackEl.innerHTML =
+        '<div class="headline">시간 초과예요 ⏰</div>' +
+        '<div>정답: <span class="answer-line">' + escapeHtml(correctSentence) + '</span></div>' +
+        '<div class="feedback-actions"><button class="primary-btn" id="next-btn">' + nextButtonLabel() + '</button></div>';
+    }
+    feedbackEl.style.display = 'block';
+    render();
+
+    if (isCorrect){
+      playCorrectSound();
+      flashAssemblyCards('correct', 550);
+    } else {
+      playWrongSound();
+      flashAssemblyCards('wrong', 480);
+    }
+
+    var nextBtn = document.getElementById('next-btn');
+    if (nextBtn) nextBtn.addEventListener('click', goNext);
+  }
+
+  // ---------- rendering ----------
+  function render(){
+    renderAssembly();
+    renderBank();
+  }
+
+  // FLIP-animated re-render of the assembly strip (smooth reordering)
+  function renderAssembly(){
+    var firstRects = {};
+    Array.prototype.forEach.call(assemblyStrip.querySelectorAll('.word-card'), function(elx){
+      firstRects[elx.dataset.id] = elx.getBoundingClientRect();
+    });
+
+    assemblyStrip.innerHTML = '';
+    answer.forEach(function(tok){
+      assemblyStrip.appendChild(makeAnswerCard(tok));
+    });
+    for (var i = answer.length; i < wordCount; i++){
+      var slot = document.createElement('div');
+      slot.className = 'slot-empty';
+      assemblyStrip.appendChild(slot);
+    }
+
+    Array.prototype.forEach.call(assemblyStrip.querySelectorAll('.word-card'), function(elx){
+      var first = firstRects[elx.dataset.id];
+      if (!first) return;
+      var last = elx.getBoundingClientRect();
+      var dx = first.left - last.left;
+      var dy = first.top - last.top;
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5){
+        elx.style.transition = 'none';
+        elx.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        elx.offsetWidth; // force reflow so the starting transform takes effect
+        requestAnimationFrame(function(){
+          elx.style.transition = 'transform 160ms ease';
+          elx.style.transform = '';
+        });
+      }
+    });
+
+    checkBtn.disabled = awaitingNext || answer.length !== wordCount;
+  }
+
+  function renderBank(){
+    wordBankEl.innerHTML = '';
+    bank.forEach(function(tok){
+      wordBankEl.appendChild(makeBankCard(tok));
+    });
+  }
+
+  function makeBankCard(tok){
+    var el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'word-card';
+    el.textContent = tok.text;
+    el.dataset.id = tok.id;
+    el.addEventListener('click', function(){
+      if (awaitingNext) return;
+      bank = bank.filter(function(t){ return t.id !== tok.id; });
+      answer.push(tok);
+      speakWord(tok.text);
+      renderAssembly();
+      renderBank();
+    });
+    return el;
+  }
+
+  function makeAnswerCard(tok){
+    var el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'word-card in-answer' + (dragging && dragging.id === tok.id ? ' drag-source' : '');
+    el.textContent = tok.text;
+    el.dataset.id = tok.id;
+    el.addEventListener('pointerdown', function(e){
+      onCardPointerDown(e, tok, el);
+    });
+    return el;
+  }
+
+  // ---------- smooth drag reordering (pointer events: works for mouse and touch) ----------
+  function onCardPointerDown(e, tok, el){
+    if (awaitingNext || dragging) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+
+    var rect = el.getBoundingClientRect();
+    dragging = {
+      id: tok.id,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+      moved: false
+    };
+    try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    document.body.classList.add('ck-dragging');
+
+    var ghost = document.createElement('div');
+    ghost.className = 'word-card in-answer drag-ghost';
+    ghost.textContent = tok.text;
+    ghost.style.position = 'fixed';
+    ghost.style.left = rect.left + 'px';
+    ghost.style.top = rect.top + 'px';
+    ghost.style.width = rect.width + 'px';
+    ghost.style.margin = '0';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.zIndex = '9999';
+    document.body.appendChild(ghost);
+    dragging.ghostEl = ghost;
+
+    renderAssembly(); // dim the source card while its ghost floats
+
+    document.addEventListener('pointermove', onDocPointerMove);
+    document.addEventListener('pointerup', onDocPointerUp);
+    document.addEventListener('pointercancel', onDocPointerUp);
+  }
+
+  function onDocPointerMove(e){
+    if (!dragging) return;
+    var dx = e.clientX - dragging.startX;
+    var dy = e.clientY - dragging.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragging.moved = true;
+
+    dragging.ghostEl.style.left = (e.clientX - dragging.offsetX) + 'px';
+    dragging.ghostEl.style.top = (e.clientY - dragging.offsetY) + 'px';
+
+    if (!dragging.moved) return;
+    var targetIndex = computeTargetIndex(e.clientX, e.clientY);
+    var curIndex = answer.findIndex(function(t){ return t.id === dragging.id; });
+    if (curIndex === -1 || targetIndex === curIndex) return;
+    moveAnswerItem(dragging.id, targetIndex);
+  }
+
+  function onDocPointerUp(){
+    if (!dragging) return;
+    document.removeEventListener('pointermove', onDocPointerMove);
+    document.removeEventListener('pointerup', onDocPointerUp);
+    document.removeEventListener('pointercancel', onDocPointerUp);
+    document.body.classList.remove('ck-dragging');
+
+    var wasMoved = dragging.moved;
+    var id = dragging.id;
+
+    if (dragging.ghostEl && dragging.ghostEl.parentNode){
+      dragging.ghostEl.parentNode.removeChild(dragging.ghostEl);
+    }
+    dragging = null;
+
+    if (!wasMoved){
+      // treated as a tap, not a drag: remove the card back to the word bank
+      var tok = answer.find(function(t){ return t.id === id; });
+      if (tok){
+        answer = answer.filter(function(t){ return t.id !== id; });
+        bank.push(tok);
+        renderAssembly();
+        renderBank();
+        return;
+      }
+    }
+    renderAssembly(); // clear the dimmed drag-source styling
+  }
+
+  // Finds the index in `answer` where the dragged card should land, based on
+  // pointer position relative to the other cards currently laid out (handles wrapping rows).
+  function computeTargetIndex(x, y){
+    var cards = Array.prototype.filter.call(assemblyStrip.querySelectorAll('.word-card'), function(elx){
+      return elx.dataset.id !== dragging.id;
+    });
+    if (!cards.length) return 0;
+
+    var rowCards = cards.filter(function(elx){
+      var r = elx.getBoundingClientRect();
+      return y >= r.top - 4 && y <= r.bottom + 4;
+    });
+    var pool = rowCards.length ? rowCards : cards;
+
+    for (var i = 0; i < pool.length; i++){
+      var r = pool[i].getBoundingClientRect();
+      var mid = r.left + r.width / 2;
+      if (x < mid){
+        var id = pool[i].dataset.id;
+        return answer.findIndex(function(t){ return t.id === id; });
+      }
+    }
+    var lastId = pool[pool.length - 1].dataset.id;
+    return answer.findIndex(function(t){ return t.id === lastId; }) + 1;
+  }
+
+  function moveAnswerItem(id, targetIndex){
+    var idx = answer.findIndex(function(t){ return t.id === id; });
+    if (idx === -1) return;
+    var item = answer.splice(idx, 1)[0];
+    // targetIndex is expressed in terms of the array before removal, so shift
+    // it down by one if it was after the removed item's original position.
+    var postIndex = (targetIndex > idx) ? targetIndex - 1 : targetIndex;
+    if (postIndex < 0) postIndex = 0;
+    if (postIndex > answer.length) postIndex = answer.length;
+    answer.splice(postIndex, 0, item);
+    renderAssembly();
+  }
+
+  // ---------- checking ----------
+  checkBtn.addEventListener('click', function(){
+    if (checkBtn.disabled) return;
+    checkAnswer();
+  });
+
+  function checkAnswer(){
+    var sentence = sentenceSet[order[currentPos]];
+    var correctWords = sentence.en.trim().split(/\s+/);
+    var userSentence = answer.map(function(t){ return t.text; }).join(' ');
+    var correctSentence = correctWords.join(' ');
+    awaitingNext = true;
+    pauseActiveTimer();
+
+    if (userSentence === correctSentence){
+      stopTimer();
+      currentSentenceCorrect = true;
+      score++;
+      scoreLabel.textContent = '점수 ' + score;
+      feedbackEl.className = 'feedback correct';
+      feedbackEl.innerHTML =
+        '<div class="headline">정답입니다! 🎉</div>' +
+        '<div>' + escapeHtml(correctSentence) + '</div>' +
+        '<div class="feedback-actions"><button class="primary-btn" id="next-btn">' + nextButtonLabel() + '</button></div>';
+    } else {
+      currentSentenceCorrect = false;
+      feedbackEl.className = 'feedback wrong';
+      feedbackEl.innerHTML =
+        '<div class="headline">아직 순서가 맞지 않아요</div>' +
+        '<div>정답: <span class="answer-line">' + escapeHtml(correctSentence) + '</span></div>' +
+        '<div class="feedback-actions">' +
+          '<button class="ghost-btn" id="retry-btn">다시 풀기</button>' +
+          '<button class="primary-btn" id="next-btn">' + nextButtonLabel() + '</button>' +
+        '</div>';
+    }
+    feedbackEl.style.display = 'block';
+    render();
+
+    if (userSentence === correctSentence){
+      playCorrectSound();
+      flashAssemblyCards('correct', 550);
+    } else {
+      playWrongSound();
+      flashAssemblyCards('wrong', 480);
+    }
+
+    var nextBtn = document.getElementById('next-btn');
+    if (nextBtn) nextBtn.addEventListener('click', goNext);
+    var retryBtn = document.getElementById('retry-btn');
+    if (retryBtn) retryBtn.addEventListener('click', function(){
+      bank = shuffle(bank.concat(answer));
+      answer = [];
+      awaitingNext = false;
+      feedbackEl.style.display = 'none';
+      resumeActiveTimer();
+      render();
+    });
+  }
+
+  function goNext(){
+    stopTimer();
+    pauseActiveTimer(); // safety: ensure the clock is stopped before recording
+    var seconds = sentenceActiveMs / 1000;
+    timePerSentence.push(seconds);
+
+    var sentence = sentenceSet[order[currentPos]];
+    sentenceResults.push({
+      en: sentence.en,
+      kr: sentence.kr,
+      seconds: seconds,
+      correct: currentSentenceCorrect
+    });
+
+    if (currentSentenceCorrect){
+      currentStreak++;
+      if (currentStreak > bestStreak) bestStreak = currentStreak;
+    } else {
+      currentStreak = 0;
+    }
+
+    currentPos++;
+    if (currentPos >= order.length){
+      finishGame();
+    } else {
+      loadSentence();
+    }
+  }
+
+  function finishGame(){
+    stopTimer();
+    document.body.classList.remove('in-game');
+    gamePanel.style.display = 'none';
+    donePanel.style.display = 'block';
+    finalScore.textContent = score;
+    finalTotal.textContent = order.length;
+
+    var totalSeconds = timePerSentence.reduce(function(a, b){ return a + b; }, 0);
+    var avgSeconds = timePerSentence.length ? totalSeconds / timePerSentence.length : 0;
+    statTotalTime.textContent = formatMinSec(totalSeconds);
+    statAvgTime.textContent = avgSeconds.toFixed(1) + '초';
+    statStreak.textContent = bestStreak + ' Combo';
+
+    renderHighlights();
+    renderComparison(totalSeconds, avgSeconds);
+
+    previousRunStats = {
+      score: score,
+      total: order.length,
+      totalSeconds: totalSeconds,
+      avgSeconds: avgSeconds,
+      bestStreak: bestStreak
+    };
+  }
+
+  function renderHighlights(){
+    highlightList.innerHTML = '';
+    if (!sentenceResults.length) return;
+
+    var fastest = sentenceResults[0];
+    var slowest = sentenceResults[0];
+    sentenceResults.forEach(function(r){
+      if (r.seconds < fastest.seconds) fastest = r;
+      if (r.seconds > slowest.seconds) slowest = r;
+    });
+
+    if (sentenceResults.length > 1 && fastest !== slowest){
+      highlightList.appendChild(makeHighlightRow('⚡', fastest, fastest.seconds.toFixed(1) + '초'));
+      highlightList.appendChild(makeHighlightRow('🐢', slowest, slowest.seconds.toFixed(1) + '초'));
+    }
+  }
+
+  function makeHighlightRow(emoji, result, secsText){
+    var row = document.createElement('div');
+    row.className = 'highlight-row';
+    row.innerHTML =
+      '<span class="emoji">' + emoji + '</span>' +
+      '<span class="en">' + escapeHtml(result.en) + '</span>' +
+      '<span class="secs">' + secsText + '</span>';
+    return row;
+  }
+
+  function renderComparison(totalSeconds, avgSeconds){
+    if (!previousRunStats){
+      compareBox.style.display = 'none';
+      return;
+    }
+    var prev = previousRunStats;
+    var scoreDiff = score - prev.score;
+    var timeDiff = prev.totalSeconds - totalSeconds; // positive = faster this time
+
+    var scoreLine;
+    if (scoreDiff > 0) scoreLine = '정답이 ' + scoreDiff + '문장 늘었어요! 🎯';
+    else if (scoreDiff < 0) scoreLine = '정답이 ' + Math.abs(scoreDiff) + '문장 줄었어요.';
+    else scoreLine = '정답 수는 지난번과 같아요.';
+
+    var timeLine;
+    if (timeDiff > 0.5) timeLine = '총 시간이 ' + timeDiff.toFixed(1) + '초 빨라졌어요! 🚀';
+    else if (timeDiff < -0.5) timeLine = '총 시간이 ' + Math.abs(timeDiff).toFixed(1) + '초 느려졌어요. 다음엔 더 빠르게!';
+    else timeLine = '총 시간은 지난번과 비슷해요.';
+
+    compareBox.style.display = 'block';
+    compareBox.innerHTML =
+      '<div class="compare-title">이전 기록과 비교</div>' +
+      '<div>지난번: ' + prev.score + '/' + prev.total + '문장 정답 · ' + formatMinSec(prev.totalSeconds) + '</div>' +
+      '<div>이번: ' + score + '/' + order.length + '문장 정답 · ' + formatMinSec(totalSeconds) + '</div>' +
+      '<div style="margin-top:6px;">' + scoreLine + '<br>' + timeLine + '</div>';
+  }
+
+  resetBtn.addEventListener('click', function(){
+    if (awaitingNext) return;
+    bank = shuffle(bank.concat(answer));
+    answer = [];
+    render();
+  });
+
+  quitBtn.addEventListener('click', function(){
+    stopTimer();
+    document.body.classList.remove('in-game');
+    gamePanel.style.display = 'none';
+    setupPanel.style.display = 'block';
+  });
+
+  replayBtn.addEventListener('click', function(){
+    donePanel.style.display = 'none';
+    startGame();
+  });
+
+  newSetBtn.addEventListener('click', function(){
+    donePanel.style.display = 'none';
+    setupPanel.style.display = 'block';
+  });
+
+})();
+</script>
+</body>
+</html>
