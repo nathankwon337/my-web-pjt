@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Word match game</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3F9142">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Word match game">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
@@ -276,6 +282,29 @@
   }
   .compare-box .compare-title{ font-weight:700; margin-bottom:4px; font-family:'Noto Serif KR', serif; }
 
+  .missed-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    max-width:420px;
+    margin:10px auto 0;
+    max-height:200px;
+    overflow-y:auto;
+    text-align:left;
+  }
+  .missed-row{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    background:#F5F7FB;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:8px 12px;
+    font-size:13px;
+  }
+  .missed-row .w{ font-family:'Inter', sans-serif; font-weight:700; color:var(--ink); }
+  .missed-row .k{ font-family:'Noto Serif KR', serif; color:var(--ink-soft); }
+
   .done-actions{ margin-top:24px; display:flex; gap:10px; justify-content:center; }
 
   @media (max-width:600px){
@@ -315,7 +344,7 @@
     </div>
 
     <div class="tab-content active" id="tab-text">
-      <textarea id="text-input" placeholder="already | 스천
+      <textarea id="text-input" placeholder="already | 이미, 벌써
 why | 왜
 search | 찾다, 검색하다
 fly | 날다
@@ -457,9 +486,19 @@ bring | 가져오다"></textarea>
 
     <div class="compare-box" id="goal-compare-box" style="display:none;"></div>
 
+    <div class="missed-section" id="missed-section" style="display:none;">
+      <div class="settings-title" style="text-align:center; margin-top:22px;">틀린 단어 (<span id="missed-count">0</span>개)</div>
+      <div class="missed-list" id="missed-list"></div>
+      <div style="text-align:center; margin-top:12px;">
+        <button class="ghost-btn" id="copy-missed-btn">📋 클립보드에 복사</button>
+      </div>
+      <p class="hint" style="text-align:center;">탭으로 구분된 "단어 · 뜻" 형식이라 엑셀에 바로 붙여넣거나, 이 게임의 "텍스트로 입력" 탭에 그대로 붙여넣어 다시 연습할 수 있어요.</p>
+    </div>
+
     <p style="color:var(--ink-soft); font-size:14px; margin-top:18px;">같은 단어 목록으로 다시 연습하거나, 새로운 단어를 입력해보세요.</p>
     <div class="done-actions">
       <button class="primary-btn" id="replay-btn">같은 단어로 다시하기</button>
+      <button class="ghost-btn" id="retry-missed-btn" style="display:none;">틀린 단어로 다시하기</button>
       <button class="ghost-btn" id="new-set-btn">새 단어 입력하기</button>
     </div>
   </section>
@@ -483,6 +522,8 @@ bring | 가져오다"></textarea>
   var totalWords = 0;
   var mistakes = 0;
   var inputLocked = false;
+  var missedPairs = [];    // {word, kr} pairs involved in any wrong attempt this game
+  var lastMissedList = []; // deduped list shown/copied on the done screen
 
   var goalEnabled = false;
   var goalSeconds = 60;
@@ -534,11 +575,17 @@ bring | 가져오다"></textarea>
   var quitBtn = document.getElementById('quit-btn');
 
   var replayBtn = document.getElementById('replay-btn');
+  var retryMissedBtn = document.getElementById('retry-missed-btn');
   var newSetBtn = document.getElementById('new-set-btn');
   var statTotalTime = document.getElementById('stat-total-time');
   var statMistakes = document.getElementById('stat-mistakes');
   var statAccuracy = document.getElementById('stat-accuracy');
   var goalCompareBox = document.getElementById('goal-compare-box');
+  var missedSection = document.getElementById('missed-section');
+  var missedCountEl = document.getElementById('missed-count');
+  var missedListEl = document.getElementById('missed-list');
+  var copyMissedBtn = document.getElementById('copy-missed-btn');
+
 
   // ---------- tabs ----------
   document.querySelectorAll('.tab-btn').forEach(function(btn){
@@ -901,6 +948,7 @@ bring | 가져오다"></textarea>
     solvedTotal = 0;
     totalWords = allPairs.length;
     mistakes = 0;
+    missedPairs = [];
 
     setupPanel.style.display = 'none';
     donePanel.style.display = 'none';
@@ -1024,6 +1072,9 @@ bring | 가져오다"></textarea>
       }, 550);
     } else {
       mistakes++;
+      // Only the foreign word side counts as "missed" — the right card it was
+      // mistakenly paired with isn't necessarily a word the person doesn't know.
+      missedPairs.push(currentBatch[L.pairId]);
       updateProgress();
       L.flash = 'wrong';
       R.flash = 'wrong';
@@ -1078,7 +1129,78 @@ bring | 가져오다"></textarea>
     } else {
       goalCompareBox.style.display = 'none';
     }
+
+    lastMissedList = dedupePairs(missedPairs);
+    if (lastMissedList.length){
+      missedSection.style.display = 'block';
+      retryMissedBtn.style.display = 'inline-flex';
+      missedCountEl.textContent = lastMissedList.length;
+      missedListEl.innerHTML = '';
+      lastMissedList.slice(0, 20).forEach(function(p){
+        var row = document.createElement('div');
+        row.className = 'missed-row';
+        row.innerHTML = '<span class="w">' + escapeHtml(p.word) + '</span><span class="k">' + escapeHtml(p.kr) + '</span>';
+        missedListEl.appendChild(row);
+      });
+      if (lastMissedList.length > 20){
+        var more = document.createElement('div');
+        more.style.cssText = 'font-size:12px;color:var(--ink-soft);text-align:center;';
+        more.textContent = '... 외 ' + (lastMissedList.length - 20) + '개 (복사하면 전체가 포함돼요)';
+        missedListEl.appendChild(more);
+      }
+    } else {
+      missedSection.style.display = 'none';
+      retryMissedBtn.style.display = 'none';
+    }
   }
+
+  function dedupePairs(list){
+    var seen = {};
+    var out = [];
+    list.forEach(function(p){
+      var key = p.word + '\u241F' + p.kr;
+      if (!seen[key]){
+        seen[key] = true;
+        out.push(p);
+      }
+    });
+    return out;
+  }
+
+  function copyToClipboard(text, btn){
+    var original = btn.textContent;
+    function done(ok){
+      btn.textContent = ok ? '✅ 복사됨!' : '복사에 실패했어요';
+      setTimeout(function(){ btn.textContent = original; }, 1600);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ done(true); }).catch(function(){ fallbackCopy(text, done); });
+    } else {
+      fallbackCopy(text, done);
+    }
+  }
+
+  function fallbackCopy(text, cb){
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      cb(ok);
+    } catch (err){
+      cb(false);
+    }
+  }
+
+  copyMissedBtn.addEventListener('click', function(){
+    var text = lastMissedList.map(function(p){ return p.word + '\t' + p.kr; }).join('\n');
+    copyToClipboard(text, copyMissedBtn);
+  });
 
   quitBtn.addEventListener('click', function(){
     clearInterval(tickInterval);
@@ -1091,12 +1213,28 @@ bring | 가져오다"></textarea>
     startGame();
   });
 
+  retryMissedBtn.addEventListener('click', function(){
+    if (!lastMissedList.length) return;
+    allPairs = lastMissedList.slice();
+    donePanel.style.display = 'none';
+    startGame();
+  });
+
   newSetBtn.addEventListener('click', function(){
     donePanel.style.display = 'none';
     setupPanel.style.display = 'block';
   });
 
 })();
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('service-worker.js').catch(function () {
+        // offline-install support is best-effort; ignore if it fails (e.g. opened via file://)
+      });
+    });
+  }
 </script>
 </body>
 </html>
