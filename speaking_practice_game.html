@@ -12,7 +12,6 @@
 <meta name="apple-mobile-web-app-title" content="Speaking practice game">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.18.2/dist/index.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js" defer></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -214,17 +213,6 @@
   }
   .word-token.correct{ color:#245A27; font-weight:700; background:var(--success-soft); }
   .word-token.wrong{ color:#7E2532; background:var(--danger-soft); }
-  .furigana-loading{
-    display:inline-block;
-    font-family:'Inter', sans-serif;
-    font-size:14px;
-    color:var(--ink-soft);
-    animation: furiganaPulse 1.4s ease-in-out infinite;
-  }
-  @keyframes furiganaPulse{
-    0%, 100%{ opacity:0.55; }
-    50%{ opacity:1; }
-  }
 
   .target-card.flash-pass{ box-shadow:0 0 0 3px var(--success); }
   .target-card.flash-fail{ box-shadow:0 0 0 3px var(--danger); animation: shakeCard .45s ease; }
@@ -442,26 +430,11 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
         <input type="checkbox" id="sound-enable" checked>
         통과/실패 효과음 재생하기
       </label>
-
-      <label class="settings-row">
-        <input type="checkbox" id="furigana-enable">
-        일본어 요미가나(읽는 법) 표시하기
-      </label>
-      <p class="hint" style="margin-top:-4px;">켜면 "연습 시작하기"를 누를 때 사전을 먼저 받아와요 (몇 초 정도 걸릴 수 있어요). 진행률이 다 차면 자동으로 문제 화면으로 넘어갑니다.</p>
+      <p class="hint">중국어 문장은 한자마다 한어병음이 자동으로 함께 표시돼요.</p>
     </div>
 
     <div class="setup-actions">
       <button class="primary-btn" id="start-btn" disabled>연습 시작하기</button>
-    </div>
-  </section>
-
-  <!-- DICTIONARY LOADING -->
-  <section class="panel" id="loading-panel" style="display:none;">
-    <div style="text-align:center; padding:16px 4px 8px;">
-      <div style="font-size:15px; font-weight:600; margin-bottom:16px;">📖 요미가나 사전을 불러오는 중이에요...</div>
-      <div class="progress-track"><div class="progress-fill" id="dict-progress-fill" style="width:0%;"></div></div>
-      <div style="margin-top:10px; font-size:13px; color:var(--ink-soft);" id="dict-progress-label">0%</div>
-      <p class="hint" style="margin-top:16px;">처음 한 번만 받으면 되고, 다 되면 자동으로 넘어가요.</p>
     </div>
   </section>
 
@@ -551,7 +524,6 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   var difficultyThreshold = 70;
   var speechLang = 'en-US';
   var soundEnabled = true;
-  var furiganaEnabled = false;
   var recognizer = null;
   var listening = false;
   var noSpeechTimer = null;
@@ -560,9 +532,6 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   // ---------- element refs ----------
   var unsupportedPanel = document.getElementById('unsupported-panel');
   var setupPanel = document.getElementById('setup-panel');
-  var loadingPanel = document.getElementById('loading-panel');
-  var dictProgressFill = document.getElementById('dict-progress-fill');
-  var dictProgressLabel = document.getElementById('dict-progress-label');
   var gamePanel = document.getElementById('game-panel');
   var donePanel = document.getElementById('done-panel');
 
@@ -585,7 +554,6 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   var difficultyGroup = document.getElementById('difficulty-group');
   var speechLangSelect = document.getElementById('speech-lang');
   var soundEnableCb = document.getElementById('sound-enable');
-  var furiganaEnableCb = document.getElementById('furigana-enable');
 
   var progressLabel = document.getElementById('progress-label');
   var diffLabel = document.getElementById('diff-label');
@@ -613,14 +581,6 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     unsupportedPanel.style.display = 'block';
     setupPanel.style.display = 'none';
   }
-
-  // Note: the Japanese furigana tokenizer (kuromoji) is intentionally NOT
-  // preloaded here. Building its dictionary is CPU-heavy, and doing it
-  // unconditionally on every page load (even for non-Japanese sentence sets)
-  // was freezing the UI thread on lower-powered mobile devices right as
-  // people tried to tap something. It's loaded lazily instead, only the
-  // first time a Japanese sentence actually needs to be rendered
-  // (see renderTargetSentence / ensureKuromoji below).
 
   // ---------- tabs ----------
   document.querySelectorAll('.tab-btn').forEach(function(btn){
@@ -693,6 +653,26 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
       previewList.appendChild(more);
     }
     startBtn.disabled = false;
+
+    var detectedLang = detectSpeechLang(list);
+    if (detectedLang) speechLangSelect.value = detectedLang;
+  }
+
+  // Best-effort language detection from the loaded sentences, to pre-fill
+  // the pronunciation/recognition language instead of leaving it on the
+  // previous selection.
+  function detectSpeechLang(list){
+    var sample = list.slice(0, 5).map(function(s){ return s.en; }).join(' ');
+    if (isJapaneseText(sample)) return 'ja-JP';
+    if (isChineseText(sample)) return 'zh-CN';
+    if (looksGerman(sample)) return 'de-DE';
+    return 'en-US';
+  }
+
+  function looksGerman(text){
+    if (/[äöüßÄÖÜ]/.test(text)) return true;
+    var germanWords = /\b(der|die|das|und|ist|nicht|ich|du|sie|wir|mit|für|auf|kann|muss|haben|sein|werden|einen|eine|einem|einer|nicht|auch|noch|schon)\b/i;
+    return germanWords.test(text);
   }
 
   // ---------- text parsing ----------
@@ -947,50 +927,6 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     return HAN_RE.test(text) && !isJapaneseText(text);
   }
 
-  function katakanaToHiragana(str){
-    return str.replace(/[\u30A1-\u30F6]/g, function(ch){
-      return String.fromCharCode(ch.charCodeAt(0) - 0x60);
-    });
-  }
-
-  // ---------- furigana (Japanese) — lazy-loaded morphological analyzer ----------
-  var kuromojiTokenizer = null;
-  var kuromojiLoadState = 'idle'; // 'idle' | 'loading' | 'ready' | 'failed'
-  var pendingKuromojiCallbacks = [];
-  function ensureKuromoji(callback){
-    if (kuromojiLoadState === 'ready'){ callback(kuromojiTokenizer); return; }
-    if (kuromojiLoadState === 'failed'){ callback(null); return; }
-    if (typeof kuromoji === 'undefined'){ kuromojiLoadState = 'failed'; callback(null); return; }
-
-    pendingKuromojiCallbacks.push(callback);
-    if (kuromojiLoadState === 'loading') return;
-    kuromojiLoadState = 'loading';
-
-    // Yield one frame first so any "loading..." UI the caller just set has a
-    // chance to actually paint before the heavy synchronous dictionary
-    // parsing starts (which briefly blocks the main thread).
-    setTimeout(function(){
-      try {
-        kuromoji.builder({ dicPath: 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/' }).build(function (err, tokenizer){
-          if (!err && tokenizer){
-            kuromojiTokenizer = tokenizer;
-            kuromojiLoadState = 'ready';
-          } else {
-            kuromojiLoadState = 'failed';
-          }
-          var cbs = pendingKuromojiCallbacks;
-          pendingKuromojiCallbacks = [];
-          cbs.forEach(function (cb){ cb(kuromojiTokenizer); });
-        });
-      } catch (err) {
-        kuromojiLoadState = 'failed';
-        var cbs2 = pendingKuromojiCallbacks;
-        pendingKuromojiCallbacks = [];
-        cbs2.forEach(function (cb){ cb(null); });
-      }
-    }, 30);
-  }
-
   function normalizeTokens(text, cjk){
     var cleaned = text.toLowerCase().replace(PUNCT_RE, '').trim();
     if (cjk){
@@ -1041,50 +977,8 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     difficultyThreshold = checkedDiff ? parseInt(checkedDiff.value, 10) : 70;
     speechLang = speechLangSelect.value;
     soundEnabled = soundEnableCb.checked;
-    furiganaEnabled = furiganaEnableCb.checked;
-
-    var needsDict = furiganaEnabled &&
-      kuromojiLoadState !== 'ready' &&
-      kuromojiLoadState !== 'failed' &&
-      sentenceSet.some(function(s){ return isJapaneseText(s.en); });
-
-    if (needsDict){
-      setupPanel.style.display = 'none';
-      loadingPanel.style.display = 'block';
-      var timer = startDictProgressAnim();
-      ensureKuromoji(function(){
-        finishDictProgressAnim(timer, function(){
-          loadingPanel.style.display = 'none';
-          startGame();
-        });
-      });
-    } else {
-      startGame();
-    }
+    startGame();
   });
-
-  // Kuromoji's classic browser loader doesn't expose real byte-level
-  // download progress, so we show a smooth estimated progress bar that eases
-  // toward 90% while loading, then snaps to 100% the moment it's actually done.
-  function startDictProgressAnim(){
-    var pct = 0;
-    dictProgressFill.style.width = '0%';
-    dictProgressLabel.textContent = '0%';
-    return setInterval(function(){
-      pct += (90 - pct) * 0.08 + 0.4;
-      if (pct > 90) pct = 90;
-      var rounded = Math.round(pct);
-      dictProgressFill.style.width = rounded + '%';
-      dictProgressLabel.textContent = rounded + '%';
-    }, 150);
-  }
-
-  function finishDictProgressAnim(timer, callback){
-    clearInterval(timer);
-    dictProgressFill.style.width = '100%';
-    dictProgressLabel.textContent = '100%';
-    setTimeout(callback, 300);
-  }
 
   function startGame(){
     order = shuffle(sentenceSet.map(function(_, i){ return i; }));
@@ -1161,40 +1055,12 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
           });
         }
       } catch (err) { /* fall back to plain spans, no pinyin */ }
-    } else if (cjk && isJapaneseText(text) && furiganaEnabled){
-      if (kuromojiLoadState === 'ready' && kuromojiTokenizer){
-        try {
-          var joined2 = words.join('');
-          var tokens = kuromojiTokenizer.tokenize(joined2);
-          var grouped = [];
-          var cursor = 0;
-          tokens.forEach(function(tok){
-            var len = tok.surface_form.length;
-            var group = spans.slice(cursor, cursor + len).join('');
-            if (HAN_RE.test(tok.surface_form) && tok.reading){
-              grouped.push('<ruby>' + group + '<rt>' + escapeHtml(katakanaToHiragana(tok.reading)) + '</rt></ruby>');
-            } else {
-              grouped.push(group);
-            }
-            cursor += len;
-          });
-          if (cursor === spans.length){ spans = grouped; }
-        } catch (err) { /* fall back to plain spans, no furigana */ }
-      } else if (kuromojiLoadState !== 'failed'){
-        // Show an explicit loading state (instead of silently doing heavy
-        // work) so it's never ambiguous whether the page is frozen or busy.
-        targetSentence.innerHTML =
-          '<span class="furigana-loading">📖 요미가나 사전을 처음 불러오는 중이에요... (몇 초 걸릴 수 있어요)</span>';
-        ensureKuromoji(function(){
-          var current = sentenceSet[order[currentPos]];
-          if (current && current.en === text){
-            renderTargetSentence(text, matchedMask);
-          }
-        });
-        return;
-      }
-      // kuromojiLoadState === 'failed': fall through and render plain spans below.
     }
+    // Japanese furigana was removed: kuromoji's dictionary requires several
+    // extra network fetches + heavy synchronous parsing, which proved
+    // unreliable (hangs) on some mobile devices. Japanese sentences still
+    // get accurate per-character correct/wrong highlighting, just without
+    // reading annotations above the kanji.
 
     targetSentence.innerHTML = spans.join('');
   }
