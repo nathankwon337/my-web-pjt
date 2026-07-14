@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Learning games</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3A4CA8">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Learning games">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -35,7 +41,7 @@
     justify-content:center;
     padding:56px 20px 64px;
   }
-  .app{ width:100%; max-width:920px; }
+  .app{ width:100%; max-width:1120px; }
 
   header.top{
     text-align:center;
@@ -64,7 +70,7 @@
 
   .game-grid{
     display:grid;
-    grid-template-columns:1fr 1fr;
+    grid-template-columns:repeat(3, 1fr);
     gap:24px;
   }
 
@@ -111,6 +117,7 @@
   }
   .game-card-wrap:nth-child(1) .manual-link:hover{ color:var(--primary); background:#EEF1FB; }
   .game-card-wrap:nth-child(2) .manual-link:hover{ color:var(--success); background:#EEF7EE; }
+  .game-card-wrap:nth-child(3) .manual-link:hover{ color:#C97A2B; background:#FBF1E5; }
 
   .game-art{
     height:190px;
@@ -119,6 +126,7 @@
   }
   .game-art.sentence-art{ background:linear-gradient(160deg,#EEF1FB,#DDE4F8); }
   .game-art.match-art{ background:linear-gradient(160deg,#EEF9EE,#DBF0DC); }
+  .game-art.speak-art{ background:linear-gradient(160deg,#FDF3E4,#FAE4C4); }
   .game-art svg{ position:absolute; inset:0; width:100%; height:100%; }
 
   .game-body{
@@ -139,6 +147,7 @@
   }
   .game-kicker.sentence{ color:var(--primary); }
   .game-kicker.match{ color:var(--success-dark); }
+  .game-kicker.speak{ color:#C97A2B; }
 
   .game-card h2{
     font-family:'Noto Serif KR', serif;
@@ -171,7 +180,13 @@
   }
   .game-card.sentence-card .play-pill{ background:var(--primary); }
   .game-card.match-card .play-pill{ background:var(--success); }
+  .game-card.speak-card .play-pill{ background:#C97A2B; }
   .game-card:active .play-pill{ transform:scale(0.98); }
+
+  @media (max-width:900px){
+    .game-grid{ grid-template-columns:1fr 1fr; }
+    .game-card-wrap:nth-child(3){ grid-column:1 / -1; }
+  }
 
   @media (max-width:600px){
     body{ padding:28px 12px 40px; }
@@ -197,7 +212,7 @@
   <header class="top">
     <div class="eyebrow">Learning games</div>
     <h1>어떤 게임을 해볼까요?</h1>
-    <p>외국어 문장과 단어를 재미있게 익히는 두 가지 게임 중 하나를 골라보세요.</p>
+    <p>외국어 문장과 단어를 재미있게 익히는 세 가지 게임 중 하나를 골라보세요.</p>
   </header>
 
   <div class="game-grid">
@@ -318,7 +333,83 @@
     </a>
     <a class="manual-link" href="word_match_game_manual.pdf" target="_blank" rel="noopener">📄 사용 설명서 (PDF)</a>
     </div>
+
+    <div class="game-card-wrap">
+    <a class="game-card speak-card" href="speaking_practice_game.html">
+      <div class="game-art speak-art">
+        <svg viewBox="0 0 400 190" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="speakAmber" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#E8A33D"/>
+              <stop offset="1" stop-color="#C97A2B"/>
+            </linearGradient>
+            <filter id="speakShadow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#1E2A44" flood-opacity="0.20"/>
+            </filter>
+          </defs>
+
+          <!-- soft depth blobs -->
+          <circle cx="368" cy="8" r="80" fill="#E8A33D" opacity="0.12"/>
+          <circle cx="12" cy="184" r="70" fill="#C97A2B" opacity="0.10"/>
+
+          <!-- sentence strip with word-level highlight preview -->
+          <g filter="url(#speakShadow)">
+            <rect x="60" y="26" width="280" height="34" rx="10" fill="#ffffff" stroke="#EAD4A0" stroke-width="1.4"/>
+          </g>
+          <rect x="74" y="36" width="46" height="14" rx="6" fill="#E4F3E3"/>
+          <rect x="128" y="36" width="60" height="14" rx="6" fill="#E4F3E3"/>
+          <rect x="196" y="36" width="42" height="14" rx="6" fill="#FBE4E7"/>
+          <rect x="246" y="36" width="70" height="14" rx="6" fill="#E4F3E3"/>
+
+          <!-- mic circle -->
+          <circle cx="200" cy="112" r="36" fill="url(#speakAmber)" filter="url(#speakShadow)"/>
+          <rect x="191" y="94" width="18" height="28" rx="9" fill="#ffffff"/>
+          <path d="M180 112 a20 20 0 0 0 40 0" stroke="#ffffff" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+          <line x1="200" y1="132" x2="200" y2="142" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/>
+          <line x1="188" y1="142" x2="212" y2="142" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/>
+
+          <!-- sound wave arcs, right side -->
+          <path d="M246 98 q12 14 0 28" stroke="#C97A2B" stroke-width="3.2" fill="none" stroke-linecap="round" opacity="0.65"/>
+          <path d="M258 90 q22 22 0 44" stroke="#C97A2B" stroke-width="3.2" fill="none" stroke-linecap="round" opacity="0.4"/>
+          <!-- sound wave arcs, left side -->
+          <path d="M154 98 q-12 14 0 28" stroke="#C97A2B" stroke-width="3.2" fill="none" stroke-linecap="round" opacity="0.65"/>
+          <path d="M142 90 q-22 22 0 44" stroke="#C97A2B" stroke-width="3.2" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+          <!-- waveform bars beneath -->
+          <g fill="#A5611C" opacity="0.55">
+            <rect x="150" y="156" width="4" height="10" rx="2"/>
+            <rect x="160" y="150" width="4" height="22" rx="2"/>
+            <rect x="170" y="158" width="4" height="6" rx="2"/>
+            <rect x="180" y="146" width="4" height="30" rx="2"/>
+            <rect x="190" y="152" width="4" height="18" rx="2"/>
+            <rect x="200" y="144" width="4" height="34" rx="2"/>
+            <rect x="210" y="152" width="4" height="18" rx="2"/>
+            <rect x="220" y="146" width="4" height="30" rx="2"/>
+            <rect x="230" y="158" width="4" height="6" rx="2"/>
+            <rect x="240" y="150" width="4" height="22" rx="2"/>
+            <rect x="250" y="156" width="4" height="10" rx="2"/>
+          </g>
+        </svg>
+      </div>
+      <div class="game-body">
+        <span class="game-kicker speak">Speaking practice game</span>
+        <h2>말하기 연습</h2>
+        <p class="desc">문장을 듣고 소리 내어 따라 말하면, 정확히 발음한 단어만 초록색으로 하이라이트돼요. 난이도(관대·보통·엄격)를 골라 통과 기준을 조절할 수 있어요.</p>
+        <span class="play-pill">말하기 연습 시작하기 →</span>
+      </div>
+    </a>
+    <div class="manual-link" style="cursor:default;">🎙️ Android Chrome 전용 (iOS 미지원)</div>
+    </div>
   </div>
 </div>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('service-worker.js').catch(function () {
+        // offline-install support is best-effort; ignore if it fails (e.g. opened via file://)
+      });
+    });
+  }
+</script>
 </body>
 </html>
