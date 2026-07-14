@@ -11,6 +11,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Speaking practice game">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.18.2/dist/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -202,6 +204,14 @@
   .target-sentence{ font-family:'Space Grotesk', monospace; font-size:19px; line-height:1.9; color:var(--ink); }
   .word-token{ display:inline-block; margin:0 2px 0 0; padding:1px 4px; border-radius:5px; transition:color .2s ease, background .2s ease; }
   .target-sentence.cjk .word-token{ margin:0; padding:1px 1px; }
+  .target-sentence ruby{ ruby-position:over; margin:0 1px; }
+  .target-sentence rt{
+    font-size:0.5em;
+    font-family:'Noto Serif KR', serif;
+    color:var(--ink-soft);
+    font-weight:500;
+    user-select:none;
+  }
   .word-token.correct{ color:#245A27; font-weight:700; background:var(--success-soft); }
   .word-token.wrong{ color:#7E2532; background:var(--danger-soft); }
 
@@ -572,6 +582,12 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     setupPanel.style.display = 'none';
   }
 
+  // Warm up the Japanese furigana tokenizer in the background (harmless if
+  // the person never uses a Japanese sentence set).
+  if (typeof ensureKuromoji === 'function'){
+    setTimeout(function(){ ensureKuromoji(function(){}); }, 1200);
+  }
+
   // ---------- tabs ----------
   document.querySelectorAll('.tab-btn').forEach(function(btn){
     btn.addEventListener('click', function(){
@@ -880,12 +896,51 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
 
   // ---------- text normalization + LCS matching ----------
   var PUNCT_RE = /[.,!?¿¡;:"“”'’。！？、，；：（）()「」『』・~〜…]/g;
+  var HAN_RE = /[\u4E00-\u9FFF\uF900-\uFAFF]/;
+  var KANA_RE = /[\u3040-\u30FF]/;
 
   // Chinese (Han), Hiragana, and Katakana ranges — languages written without
   // spaces between words, where whitespace-splitting collapses to one token.
   var CJK_RE = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
   function isCJKText(text){
     return CJK_RE.test(text);
+  }
+  // Presence of kana strongly implies Japanese; Han without kana implies Chinese.
+  function isJapaneseText(text){
+    return KANA_RE.test(text);
+  }
+  function isChineseText(text){
+    return HAN_RE.test(text) && !isJapaneseText(text);
+  }
+
+  function katakanaToHiragana(str){
+    return str.replace(/[\u30A1-\u30F6]/g, function(ch){
+      return String.fromCharCode(ch.charCodeAt(0) - 0x60);
+    });
+  }
+
+  // ---------- furigana (Japanese) — lazy-loaded morphological analyzer ----------
+  var kuromojiTokenizer = null;
+  var kuromojiLoadStarted = false;
+  var pendingKuromojiCallbacks = [];
+  function ensureKuromoji(callback){
+    if (kuromojiTokenizer){ callback(kuromojiTokenizer); return; }
+    if (typeof kuromoji === 'undefined'){ callback(null); return; }
+    pendingKuromojiCallbacks.push(callback);
+    if (kuromojiLoadStarted) return;
+    kuromojiLoadStarted = true;
+    try {
+      kuromoji.builder({ dicPath: 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/' }).build(function (err, tokenizer){
+        if (!err) kuromojiTokenizer = tokenizer;
+        var cbs = pendingKuromojiCallbacks;
+        pendingKuromojiCallbacks = [];
+        cbs.forEach(function (cb){ cb(kuromojiTokenizer); });
+      });
+    } catch (err) {
+      var cbs2 = pendingKuromojiCallbacks;
+      pendingKuromojiCallbacks = [];
+      cbs2.forEach(function (cb){ cb(null); });
+    }
   }
 
   function normalizeTokens(text, cjk){
@@ -998,13 +1053,58 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
       words = text.trim().split(/\s+/);
     }
 
-    targetSentence.innerHTML = words.map(function(w, i){
+    var spans = words.map(function(w, i){
       var cls = 'word-token';
       if (matchedMask){
         cls += matchedMask[i] ? ' correct' : ' wrong';
       }
       return '<span class="' + cls + '">' + escapeHtml(w) + '</span>';
-    }).join('');
+    });
+
+    if (cjk && isChineseText(text) && typeof pinyinPro !== 'undefined'){
+      try {
+        var joined = words.join('');
+        var pinyinArr = pinyinPro.pinyin(joined, { type: 'array', toneType: 'symbol' });
+        if (pinyinArr && pinyinArr.length === spans.length){
+          spans = spans.map(function(spanHtml, i){
+            return '<ruby>' + spanHtml + '<rt>' + escapeHtml(pinyinArr[i] || '') + '</rt></ruby>';
+          });
+        }
+      } catch (err) { /* fall back to plain spans, no pinyin */ }
+    } else if (cjk && isJapaneseText(text)){
+      if (kuromojiTokenizer){
+        try {
+          var joined2 = words.join('');
+          var tokens = kuromojiTokenizer.tokenize(joined2);
+          var grouped = [];
+          var cursor = 0;
+          var okForAll = true;
+          tokens.forEach(function(tok){
+            var len = tok.surface_form.length;
+            var group = spans.slice(cursor, cursor + len).join('');
+            if (HAN_RE.test(tok.surface_form) && tok.reading){
+              grouped.push('<ruby>' + group + '<rt>' + escapeHtml(katakanaToHiragana(tok.reading)) + '</rt></ruby>');
+            } else {
+              grouped.push(group);
+            }
+            cursor += len;
+          });
+          if (cursor === spans.length){ spans = grouped; }
+          else { okForAll = false; }
+        } catch (err) { /* fall back to plain spans, no furigana */ }
+      } else {
+        // Tokenizer not ready yet — kick off loading and re-render this same
+        // sentence with furigana once it becomes available.
+        ensureKuromoji(function(){
+          var current = sentenceSet[order[currentPos]];
+          if (current && current.en === text){
+            renderTargetSentence(text, matchedMask);
+          }
+        });
+      }
+    }
+
+    targetSentence.innerHTML = spans.join('');
   }
 
   listenBtn.addEventListener('click', function(){
