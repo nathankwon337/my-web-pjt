@@ -447,11 +447,21 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
         <input type="checkbox" id="furigana-enable">
         일본어 요미가나(읽는 법) 표시하기
       </label>
-      <p class="hint" style="margin-top:-4px;">사전을 새로 불러와야 해서 일본어 문장이 처음 나올 때 몇 초 정도 걸릴 수 있어요. 그 동안 "요미가나 불러오는 중" 표시가 나와요.</p>
+      <p class="hint" style="margin-top:-4px;">켜면 "연습 시작하기"를 누를 때 사전을 먼저 받아와요 (몇 초 정도 걸릴 수 있어요). 진행률이 다 차면 자동으로 문제 화면으로 넘어갑니다.</p>
     </div>
 
     <div class="setup-actions">
       <button class="primary-btn" id="start-btn" disabled>연습 시작하기</button>
+    </div>
+  </section>
+
+  <!-- DICTIONARY LOADING -->
+  <section class="panel" id="loading-panel" style="display:none;">
+    <div style="text-align:center; padding:16px 4px 8px;">
+      <div style="font-size:15px; font-weight:600; margin-bottom:16px;">📖 요미가나 사전을 불러오는 중이에요...</div>
+      <div class="progress-track"><div class="progress-fill" id="dict-progress-fill" style="width:0%;"></div></div>
+      <div style="margin-top:10px; font-size:13px; color:var(--ink-soft);" id="dict-progress-label">0%</div>
+      <p class="hint" style="margin-top:16px;">처음 한 번만 받으면 되고, 다 되면 자동으로 넘어가요.</p>
     </div>
   </section>
 
@@ -550,6 +560,9 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   // ---------- element refs ----------
   var unsupportedPanel = document.getElementById('unsupported-panel');
   var setupPanel = document.getElementById('setup-panel');
+  var loadingPanel = document.getElementById('loading-panel');
+  var dictProgressFill = document.getElementById('dict-progress-fill');
+  var dictProgressLabel = document.getElementById('dict-progress-label');
   var gamePanel = document.getElementById('game-panel');
   var donePanel = document.getElementById('done-panel');
 
@@ -1029,8 +1042,49 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     speechLang = speechLangSelect.value;
     soundEnabled = soundEnableCb.checked;
     furiganaEnabled = furiganaEnableCb.checked;
-    startGame();
+
+    var needsDict = furiganaEnabled &&
+      kuromojiLoadState !== 'ready' &&
+      kuromojiLoadState !== 'failed' &&
+      sentenceSet.some(function(s){ return isJapaneseText(s.en); });
+
+    if (needsDict){
+      setupPanel.style.display = 'none';
+      loadingPanel.style.display = 'block';
+      var timer = startDictProgressAnim();
+      ensureKuromoji(function(){
+        finishDictProgressAnim(timer, function(){
+          loadingPanel.style.display = 'none';
+          startGame();
+        });
+      });
+    } else {
+      startGame();
+    }
   });
+
+  // Kuromoji's classic browser loader doesn't expose real byte-level
+  // download progress, so we show a smooth estimated progress bar that eases
+  // toward 90% while loading, then snaps to 100% the moment it's actually done.
+  function startDictProgressAnim(){
+    var pct = 0;
+    dictProgressFill.style.width = '0%';
+    dictProgressLabel.textContent = '0%';
+    return setInterval(function(){
+      pct += (90 - pct) * 0.08 + 0.4;
+      if (pct > 90) pct = 90;
+      var rounded = Math.round(pct);
+      dictProgressFill.style.width = rounded + '%';
+      dictProgressLabel.textContent = rounded + '%';
+    }, 150);
+  }
+
+  function finishDictProgressAnim(timer, callback){
+    clearInterval(timer);
+    dictProgressFill.style.width = '100%';
+    dictProgressLabel.textContent = '100%';
+    setTimeout(callback, 300);
+  }
 
   function startGame(){
     order = shuffle(sentenceSet.map(function(_, i){ return i; }));
