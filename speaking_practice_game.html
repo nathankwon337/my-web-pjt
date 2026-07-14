@@ -201,6 +201,7 @@
   }
   .target-sentence{ font-family:'Space Grotesk', monospace; font-size:19px; line-height:1.9; color:var(--ink); }
   .word-token{ display:inline-block; margin:0 2px 0 0; padding:1px 4px; border-radius:5px; transition:color .2s ease, background .2s ease; }
+  .target-sentence.cjk .word-token{ margin:0; padding:1px 1px; }
   .word-token.correct{ color:#245A27; font-weight:700; background:var(--success-soft); }
   .word-token.wrong{ color:#7E2532; background:var(--danger-soft); }
 
@@ -878,12 +879,22 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   }
 
   // ---------- text normalization + LCS matching ----------
-  function normalizeTokens(text){
-    return text.toLowerCase()
-      .replace(/[.,!?¿¡;:"“”'’]/g, '')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
+  var PUNCT_RE = /[.,!?¿¡;:"“”'’。！？、，；：（）()「」『』・~〜…]/g;
+
+  // Chinese (Han), Hiragana, and Katakana ranges — languages written without
+  // spaces between words, where whitespace-splitting collapses to one token.
+  var CJK_RE = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
+  function isCJKText(text){
+    return CJK_RE.test(text);
+  }
+
+  function normalizeTokens(text, cjk){
+    var cleaned = text.toLowerCase().replace(PUNCT_RE, '').trim();
+    if (cjk){
+      // No spaces to split on — treat each character as one token.
+      return Array.from(cleaned.replace(/\s+/g, '')).filter(Boolean);
+    }
+    return cleaned.split(/\s+/).filter(Boolean);
   }
 
   function lcsMatchedMask(targetTokens, saidTokens){
@@ -974,7 +985,19 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   }
 
   function renderTargetSentence(text, matchedMask){
-    var words = text.trim().split(/\s+/);
+    var cjk = isCJKText(text);
+    targetSentence.classList.toggle('cjk', cjk);
+
+    var words;
+    if (cjk){
+      // Strip punctuation and spaces, then split into individual characters —
+      // there's no whitespace to split on, and punctuation would otherwise
+      // show up as a permanently "wrong" token since STT never says it aloud.
+      words = Array.from(text.replace(PUNCT_RE, '').replace(/\s+/g, ''));
+    } else {
+      words = text.trim().split(/\s+/);
+    }
+
     targetSentence.innerHTML = words.map(function(w, i){
       var cls = 'word-token';
       if (matchedMask){
@@ -1110,8 +1133,9 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     totalAttempts++;
 
     var sentence = sentenceSet[order[currentPos]];
-    var targetTokens = normalizeTokens(sentence.en);
-    var saidTokens = normalizeTokens(transcript || '');
+    var cjk = isCJKText(sentence.en);
+    var targetTokens = normalizeTokens(sentence.en, cjk);
+    var saidTokens = normalizeTokens(transcript || '', cjk);
     var matched = lcsMatchedMask(targetTokens, saidTokens);
     var score = scoreByCharLength(targetTokens, matched);
 
