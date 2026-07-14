@@ -214,6 +214,17 @@
   }
   .word-token.correct{ color:#245A27; font-weight:700; background:var(--success-soft); }
   .word-token.wrong{ color:#7E2532; background:var(--danger-soft); }
+  .furigana-loading{
+    display:inline-block;
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    color:var(--ink-soft);
+    animation: furiganaPulse 1.4s ease-in-out infinite;
+  }
+  @keyframes furiganaPulse{
+    0%, 100%{ opacity:0.55; }
+    50%{ opacity:1; }
+  }
 
   .target-card.flash-pass{ box-shadow:0 0 0 3px var(--success); }
   .target-card.flash-fail{ box-shadow:0 0 0 3px var(--danger); animation: shakeCard .45s ease; }
@@ -431,6 +442,12 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
         <input type="checkbox" id="sound-enable" checked>
         통과/실패 효과음 재생하기
       </label>
+
+      <label class="settings-row">
+        <input type="checkbox" id="furigana-enable">
+        일본어 요미가나(읽는 법) 표시하기
+      </label>
+      <p class="hint" style="margin-top:-4px;">사전을 새로 불러와야 해서 일본어 문장이 처음 나올 때 몇 초 정도 걸릴 수 있어요. 그 동안 "요미가나 불러오는 중" 표시가 나와요.</p>
     </div>
 
     <div class="setup-actions">
@@ -524,6 +541,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   var difficultyThreshold = 70;
   var speechLang = 'en-US';
   var soundEnabled = true;
+  var furiganaEnabled = false;
   var recognizer = null;
   var listening = false;
   var noSpeechTimer = null;
@@ -554,6 +572,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   var difficultyGroup = document.getElementById('difficulty-group');
   var speechLangSelect = document.getElementById('speech-lang');
   var soundEnableCb = document.getElementById('sound-enable');
+  var furiganaEnableCb = document.getElementById('furigana-enable');
 
   var progressLabel = document.getElementById('progress-label');
   var diffLabel = document.getElementById('diff-label');
@@ -923,26 +942,40 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
 
   // ---------- furigana (Japanese) — lazy-loaded morphological analyzer ----------
   var kuromojiTokenizer = null;
-  var kuromojiLoadStarted = false;
+  var kuromojiLoadState = 'idle'; // 'idle' | 'loading' | 'ready' | 'failed'
   var pendingKuromojiCallbacks = [];
   function ensureKuromoji(callback){
-    if (kuromojiTokenizer){ callback(kuromojiTokenizer); return; }
-    if (typeof kuromoji === 'undefined'){ callback(null); return; }
+    if (kuromojiLoadState === 'ready'){ callback(kuromojiTokenizer); return; }
+    if (kuromojiLoadState === 'failed'){ callback(null); return; }
+    if (typeof kuromoji === 'undefined'){ kuromojiLoadState = 'failed'; callback(null); return; }
+
     pendingKuromojiCallbacks.push(callback);
-    if (kuromojiLoadStarted) return;
-    kuromojiLoadStarted = true;
-    try {
-      kuromoji.builder({ dicPath: 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/' }).build(function (err, tokenizer){
-        if (!err) kuromojiTokenizer = tokenizer;
-        var cbs = pendingKuromojiCallbacks;
+    if (kuromojiLoadState === 'loading') return;
+    kuromojiLoadState = 'loading';
+
+    // Yield one frame first so any "loading..." UI the caller just set has a
+    // chance to actually paint before the heavy synchronous dictionary
+    // parsing starts (which briefly blocks the main thread).
+    setTimeout(function(){
+      try {
+        kuromoji.builder({ dicPath: 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/' }).build(function (err, tokenizer){
+          if (!err && tokenizer){
+            kuromojiTokenizer = tokenizer;
+            kuromojiLoadState = 'ready';
+          } else {
+            kuromojiLoadState = 'failed';
+          }
+          var cbs = pendingKuromojiCallbacks;
+          pendingKuromojiCallbacks = [];
+          cbs.forEach(function (cb){ cb(kuromojiTokenizer); });
+        });
+      } catch (err) {
+        kuromojiLoadState = 'failed';
+        var cbs2 = pendingKuromojiCallbacks;
         pendingKuromojiCallbacks = [];
-        cbs.forEach(function (cb){ cb(kuromojiTokenizer); });
-      });
-    } catch (err) {
-      var cbs2 = pendingKuromojiCallbacks;
-      pendingKuromojiCallbacks = [];
-      cbs2.forEach(function (cb){ cb(null); });
-    }
+        cbs2.forEach(function (cb){ cb(null); });
+      }
+    }, 30);
   }
 
   function normalizeTokens(text, cjk){
@@ -995,6 +1028,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     difficultyThreshold = checkedDiff ? parseInt(checkedDiff.value, 10) : 70;
     speechLang = speechLangSelect.value;
     soundEnabled = soundEnableCb.checked;
+    furiganaEnabled = furiganaEnableCb.checked;
     startGame();
   });
 
@@ -1073,14 +1107,13 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
           });
         }
       } catch (err) { /* fall back to plain spans, no pinyin */ }
-    } else if (cjk && isJapaneseText(text)){
-      if (kuromojiTokenizer){
+    } else if (cjk && isJapaneseText(text) && furiganaEnabled){
+      if (kuromojiLoadState === 'ready' && kuromojiTokenizer){
         try {
           var joined2 = words.join('');
           var tokens = kuromojiTokenizer.tokenize(joined2);
           var grouped = [];
           var cursor = 0;
-          var okForAll = true;
           tokens.forEach(function(tok){
             var len = tok.surface_form.length;
             var group = spans.slice(cursor, cursor + len).join('');
@@ -1092,18 +1125,21 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
             cursor += len;
           });
           if (cursor === spans.length){ spans = grouped; }
-          else { okForAll = false; }
         } catch (err) { /* fall back to plain spans, no furigana */ }
-      } else {
-        // Tokenizer not ready yet — kick off loading and re-render this same
-        // sentence with furigana once it becomes available.
+      } else if (kuromojiLoadState !== 'failed'){
+        // Show an explicit loading state (instead of silently doing heavy
+        // work) so it's never ambiguous whether the page is frozen or busy.
+        targetSentence.innerHTML =
+          '<span class="furigana-loading">📖 요미가나 사전을 처음 불러오는 중이에요... (몇 초 걸릴 수 있어요)</span>';
         ensureKuromoji(function(){
           var current = sentenceSet[order[currentPos]];
           if (current && current.en === text){
             renderTargetSentence(text, matchedMask);
           }
         });
+        return;
       }
+      // kuromojiLoadState === 'failed': fall through and render plain spans below.
     }
 
     targetSentence.innerHTML = spans.join('');
