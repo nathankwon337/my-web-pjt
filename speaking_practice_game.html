@@ -200,7 +200,7 @@
     text-align:center; transition:box-shadow .2s ease, background .2s ease;
   }
   .target-sentence{ font-family:'Space Grotesk', monospace; font-size:19px; line-height:1.9; color:var(--ink); }
-  .word-token{ display:inline-block; margin:0 3px; padding:1px 5px; border-radius:5px; transition:color .2s ease, background .2s ease; }
+  .word-token{ display:inline-block; margin:0 2px 0 0; padding:1px 4px; border-radius:5px; transition:color .2s ease, background .2s ease; }
   .word-token.correct{ color:#245A27; font-weight:700; background:var(--success-soft); }
   .word-token.wrong{ color:#7E2532; background:var(--danger-soft); }
 
@@ -230,13 +230,29 @@
   .icon-btn .lbl{ font-size:12px; font-weight:600; color:var(--ink-soft); }
   .icon-btn:active .circle{ transform:translateY(2px); box-shadow:0 1px 0 var(--border); }
   .icon-btn.listen-btn .circle{ border-color:var(--primary); color:var(--primary); }
+  .icon-btn.listen-btn.active .circle{
+    background:var(--primary); color:#fff; animation: listenPulse 1s infinite;
+  }
+  @keyframes listenPulse{
+    0%{ box-shadow:0 0 0 0 rgba(201,122,43,0.45); }
+    70%{ box-shadow:0 0 0 14px rgba(201,122,43,0); }
+    100%{ box-shadow:0 0 0 0 rgba(201,122,43,0); }
+  }
   .icon-btn.mic-btn .circle{ border-color:var(--danger); color:var(--danger); }
   .icon-btn.mic-btn.listening .circle{
     background:var(--danger); color:#fff; animation: micPulse 1.2s infinite;
   }
+  .icon-btn.mic-btn.listening.speaking .circle{
+    animation: micPulseActive 0.6s infinite; transform:scale(1.06);
+  }
   @keyframes micPulse{
     0%{ box-shadow:0 0 0 0 rgba(209,73,91,0.45); }
     70%{ box-shadow:0 0 0 16px rgba(209,73,91,0); }
+    100%{ box-shadow:0 0 0 0 rgba(209,73,91,0); }
+  }
+  @keyframes micPulseActive{
+    0%{ box-shadow:0 0 0 0 rgba(209,73,91,0.6); }
+    70%{ box-shadow:0 0 0 20px rgba(209,73,91,0); }
     100%{ box-shadow:0 0 0 0 rgba(209,73,91,0); }
   }
   .icon-btn:disabled .circle{ opacity:0.4; cursor:not-allowed; }
@@ -257,6 +273,7 @@
   .stat-label{ font-size:12px; color:var(--ink-soft); font-weight:600; margin-bottom:6px; }
   .stat-value{ font-family:'Space Grotesk', monospace; font-size:22px; font-weight:700; color:var(--primary); }
   .done-actions{ margin-top:24px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .done-actions .primary-btn, .done-actions .ghost-btn{ padding:13px 22px; min-width:190px; text-align:center; }
 
   @media (max-width:600px){
     body{ padding:20px 12px 48px; }
@@ -346,7 +363,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
         <label for="gh-branch">브랜치</label>
         <input type="text" id="gh-branch" placeholder="비워두면 기본 브랜치 사용">
       </div>
-      <p class="hint">공개(public) 저장소만 지원합니다. 파일명이 <code>speaking_practice</code>로 시작하는 엑셀 파일만 목록에 표시됩니다.</p>
+      <p class="hint">공개(public) 저장소만 지원합니다. 이 폴더의 엑셀 파일(.xlsx, .xls) 목록이 모두 표시됩니다.</p>
       <div style="margin-top:10px;">
         <button class="ghost-btn" id="gh-list-btn">엑셀 파일 목록 불러오기</button>
       </div>
@@ -363,20 +380,20 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     <div class="settings-box">
       <div class="settings-title">난이도 (통과 기준)</div>
       <div class="difficulty-group" id="difficulty-group">
-        <label class="difficulty-opt" data-value="60">
-          <input type="radio" name="difficulty" value="60">
+        <label class="difficulty-opt" data-value="50">
+          <input type="radio" name="difficulty" value="50">
           <div class="lbl">관대</div>
-          <div class="pct">60% 이상</div>
+          <div class="pct">50% 이상</div>
         </label>
-        <label class="difficulty-opt checked" data-value="80">
-          <input type="radio" name="difficulty" value="80" checked>
+        <label class="difficulty-opt checked" data-value="70">
+          <input type="radio" name="difficulty" value="70" checked>
           <div class="lbl">보통</div>
-          <div class="pct">80% 이상</div>
+          <div class="pct">70% 이상</div>
         </label>
-        <label class="difficulty-opt" data-value="95">
-          <input type="radio" name="difficulty" value="95">
+        <label class="difficulty-opt" data-value="90">
+          <input type="radio" name="difficulty" value="90">
           <div class="lbl">엄격</div>
-          <div class="pct">95% 이상</div>
+          <div class="pct">90% 이상</div>
         </label>
       </div>
 
@@ -493,7 +510,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   var scoreSum = 0;
   var scoreCount = 0;
   var startTime = 0;
-  var difficultyThreshold = 80;
+  var difficultyThreshold = 70;
   var speechLang = 'en-US';
   var soundEnabled = true;
   var recognizer = null;
@@ -749,7 +766,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
       .then(function(items){
         if (!Array.isArray(items)) throw new Error('입력한 경로가 폴더가 아닙니다.');
         var files = items.filter(function(it){
-          return it.type === 'file' && /^speaking_practice/i.test(it.name) && /\.(xlsx|xls)$/i.test(it.name);
+          return it.type === 'file' && /\.(xlsx|xls)$/i.test(it.name);
         });
         renderGhFileList(files);
       })
@@ -762,7 +779,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
 
   function renderGhFileList(files){
     if (!files.length){
-      setGhFileListContent('<div class="gh-file-note">이 폴더에서 "speaking_practice"로 시작하는 엑셀 파일(.xlsx, .xls)을 찾지 못했습니다.</div>');
+      setGhFileListContent('<div class="gh-file-note">이 폴더에서 엑셀 파일(.xlsx, .xls)을 찾지 못했습니다.</div>');
       return;
     }
     ghFileList.innerHTML = '';
@@ -853,6 +870,9 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
       var utter = new SpeechSynthesisUtterance(text);
       utter.lang = speechLang;
       utter.rate = 0.9;
+      utter.onstart = function(){ listenBtn.classList.add('active'); };
+      utter.onend = function(){ listenBtn.classList.remove('active'); };
+      utter.onerror = function(){ listenBtn.classList.remove('active'); };
       window.speechSynthesis.speak(utter);
     } catch (err) { /* ignore */ }
   }
@@ -886,11 +906,25 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     return matched;
   }
 
+  // Score by character length rather than word count, so a wrong short word
+  // (e.g. "am") costs less than a wrong long word (e.g. "policeman").
+  // score = (matched letters / total letters) * 100
+  function scoreByCharLength(targetTokens, matched){
+    var totalChars = 0, matchedChars = 0;
+    for (var i = 0; i < targetTokens.length; i++){
+      var len = targetTokens[i].length;
+      totalChars += len;
+      if (matched[i]) matchedChars += len;
+    }
+    if (!totalChars) return 0;
+    return Math.round((matchedChars / totalChars) * 100);
+  }
+
   // ---------- game flow ----------
   startBtn.addEventListener('click', function(){
     if (!sentenceSet.length) return;
     var checkedDiff = difficultyGroup.querySelector('input:checked');
-    difficultyThreshold = checkedDiff ? parseInt(checkedDiff.value, 10) : 80;
+    difficultyThreshold = checkedDiff ? parseInt(checkedDiff.value, 10) : 70;
     speechLang = speechLangSelect.value;
     soundEnabled = soundEnableCb.checked;
     startGame();
@@ -909,7 +943,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     donePanel.style.display = 'none';
     gamePanel.style.display = 'block';
 
-    var diffNames = { 60: '관대', 80: '보통', 95: '엄격' };
+    var diffNames = { 50: '관대', 70: '보통', 90: '엄격' };
     diffLabel.textContent = (diffNames[difficultyThreshold] || '보통') + ' (' + difficultyThreshold + '%)';
 
     loadSentence();
@@ -933,6 +967,10 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
 
     listenBtn.disabled = false;
     micBtn.disabled = false;
+
+    // Auto-play the pronunciation as soon as the sentence appears.
+    // The listen button stays available for replaying manually.
+    setTimeout(function(){ speakSentence(sentence.en); }, 250);
   }
 
   function renderTargetSentence(text, matchedMask){
@@ -943,7 +981,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
         cls += matchedMask[i] ? ' correct' : ' wrong';
       }
       return '<span class="' + cls + '">' + escapeHtml(w) + '</span>';
-    }).join(' ');
+    }).join('');
   }
 
   listenBtn.addEventListener('click', function(){
@@ -992,6 +1030,13 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
         }
       }
       resetSilenceGrace();
+    };
+
+    recognizer.onspeechstart = function(){
+      micBtn.classList.add('speaking');
+    };
+    recognizer.onspeechend = function(){
+      micBtn.classList.remove('speaking');
     };
 
     recognizer.onerror = function(e){
@@ -1056,6 +1101,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   function finishListening(){
     listening = false;
     micBtn.classList.remove('listening');
+    micBtn.classList.remove('speaking');
     clearTimeout(noSpeechTimer);
   }
 
@@ -1067,8 +1113,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     var targetTokens = normalizeTokens(sentence.en);
     var saidTokens = normalizeTokens(transcript || '');
     var matched = lcsMatchedMask(targetTokens, saidTokens);
-    var matchedCount = matched.filter(Boolean).length;
-    var score = targetTokens.length ? Math.round((matchedCount / targetTokens.length) * 100) : 0;
+    var score = scoreByCharLength(targetTokens, matched);
 
     scoreSum += score;
     scoreCount++;
