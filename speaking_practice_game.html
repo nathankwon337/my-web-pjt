@@ -582,11 +582,13 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     setupPanel.style.display = 'none';
   }
 
-  // Warm up the Japanese furigana tokenizer in the background (harmless if
-  // the person never uses a Japanese sentence set).
-  if (typeof ensureKuromoji === 'function'){
-    setTimeout(function(){ ensureKuromoji(function(){}); }, 1200);
-  }
+  // Note: the Japanese furigana tokenizer (kuromoji) is intentionally NOT
+  // preloaded here. Building its dictionary is CPU-heavy, and doing it
+  // unconditionally on every page load (even for non-Japanese sentence sets)
+  // was freezing the UI thread on lower-powered mobile devices right as
+  // people tried to tap something. It's loaded lazily instead, only the
+  // first time a Japanese sentence actually needs to be rendered
+  // (see renderTargetSentence / ensureKuromoji below).
 
   // ---------- tabs ----------
   document.querySelectorAll('.tab-btn').forEach(function(btn){
