@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TOEFL Voca Trainer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#6C4AB6">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TOEFL Voca Trainer">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bg:#EEF1F6;
+    --paper:#FFFFFF;
+    --ink:#1E2A44;
+    --ink-soft:#5B6580;
+    --primary:#6C4AB6;
+    --primary-dark:#563A93;
+    --primary-soft:#EDE7F8;
+    --amber:#E8A33D;
+    --amber-soft:#FBEBD2;
+    --success:#3F9142;
+    --success-soft:#E4F3E3;
+    --danger:#D1495B;
+    --danger-soft:#FBE4E7;
+    --border:#CBD2E3;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; min-height:100vh;
+    background: radial-gradient(circle at 1px 1px, #dde2ef 1px, transparent 1px) 0 0/24px 24px, var(--bg);
+    font-family:'Inter', sans-serif; color:var(--ink);
+    display:flex; justify-content:center; padding:32px 16px 64px;
+  }
+  .app{ width:100%; max-width:820px; }
+
+  header.top{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:10px; }
+  header.top .title-group{ min-width:0; }
+  header.top h1{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:26px; margin:0; letter-spacing:-0.01em; }
+  header.top .subtitle{ font-size:13px; color:var(--ink-soft); }
+  header.top .home-link{
+    display:inline-flex; align-items:center; gap:6px; flex-shrink:0;
+    font-family:'Inter', sans-serif; font-size:13px; font-weight:600; color:var(--ink-soft);
+    text-decoration:none; background:#fff; border:1px solid var(--border); border-radius:20px;
+    padding:7px 14px; transition:border-color .15s ease, color .15s ease; white-space:nowrap;
+  }
+  header.top .home-link:hover{ border-color:var(--primary); color:var(--primary); }
+
+  .panel{ background:var(--paper); border:1px solid var(--border); border-radius:16px; padding:28px;
+    box-shadow:0 1px 2px rgba(30,42,68,0.04), 0 8px 24px -12px rgba(30,42,68,0.10); }
+
+  .tabs{ display:flex; gap:6px; margin-bottom:20px; border-bottom:1px solid var(--border); }
+  .tab-btn{ appearance:none; border:none; background:none; padding:10px 4px; margin-right:20px;
+    font-family:'Inter',sans-serif; font-size:14.5px; font-weight:600; color:var(--ink-soft);
+    cursor:pointer; border-bottom:2px solid transparent; transform:translateY(1px); }
+  .tab-btn.active{ color:var(--primary); border-bottom:2px solid var(--primary); }
+  .tab-content{ display:none; }
+  .tab-content.active{ display:block; }
+
+  textarea{ width:100%; min-height:130px; font-family:'Space Grotesk', monospace; font-size:13.5px; line-height:1.6;
+    padding:14px; border:1px solid var(--border); border-radius:10px; resize:vertical; background:#FBFCFE; color:var(--ink); }
+  textarea:focus{ outline:2px solid var(--primary); outline-offset:1px; }
+
+  .hint{ font-size:12.5px; color:var(--ink-soft); margin:8px 0 0; line-height:1.6; }
+  .hint code{ background:var(--amber-soft); padding:1px 6px; border-radius:4px; font-family:'Space Grotesk', monospace; }
+
+  .file-drop{ border:1.5px dashed var(--border); border-radius:12px; padding:24px 16px; text-align:center; color:var(--ink-soft); font-size:13.5px; }
+  .file-drop input{ margin-top:12px; }
+
+  .col-spec{ margin-top:10px; font-size:12px; color:var(--ink-soft); background:#F5F7FB; border-radius:8px; padding:10px 12px; line-height:1.8; }
+  .col-spec b{ color:var(--ink); }
+
+  .gh-field{ display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+  .gh-field label{ min-width:70px; font-size:13.5px; font-weight:600; color:var(--ink-soft); }
+  .gh-field input{ flex:1; min-width:140px; padding:8px 10px; border:1px solid var(--border); border-radius:8px;
+    font-family:'Space Grotesk', monospace; font-size:13.5px; background:#FBFCFE; color:var(--ink); }
+  .gh-file-list{ display:flex; flex-direction:column; gap:6px; margin-top:14px; max-height:200px; overflow-y:auto; }
+  .gh-file-list.is-hidden{ display:none; }
+  .gh-file-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px;
+    background:#F5F7FB; border:1px solid var(--border); border-radius:8px; font-size:13.5px; cursor:pointer; }
+  .gh-file-row:hover{ border-color:var(--primary); background:#F3EEFB; }
+  .gh-file-row .name{ font-family:'Space Grotesk', monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .gh-file-row .pick{ color:var(--primary); font-weight:700; font-size:12.5px; white-space:nowrap; flex-shrink:0; }
+  .gh-file-note{ padding:10px 4px; font-size:13px; color:var(--ink-soft); }
+
+  .preview{ margin-top:18px; border-top:1px solid var(--border); padding-top:16px; }
+  .preview .count{ font-weight:600; font-size:14px; margin-bottom:8px; }
+  .preview .count strong{ color:var(--primary); }
+  .preview-list{ display:flex; flex-direction:column; gap:6px; max-height:130px; overflow-y:auto; }
+  .preview-row{ display:flex; gap:10px; font-size:13px; padding:6px 10px; background:#F5F7FB; border-radius:6px; }
+  .preview-row .w{ font-family:'Space Grotesk', monospace; flex:0.8; color:var(--ink); font-weight:700; }
+  .preview-row .m{ flex:1; color:var(--ink-soft); font-family:'Noto Serif KR', serif; }
+
+  .error-msg{ color:var(--danger); font-size:13px; margin-top:10px; font-weight:600; }
+
+  .primary-btn{ appearance:none; border:none; background:var(--primary); color:#fff; font-family:'Inter',sans-serif;
+    font-weight:700; font-size:15px; padding:13px 22px; border-radius:10px; cursor:pointer;
+    transition:background .15s ease, transform .1s ease; text-decoration:none; display:inline-block; }
+  .primary-btn:hover{ background:var(--primary-dark); }
+  .primary-btn:active{ transform:scale(0.98); }
+  .primary-btn:disabled{ background:#CBBEE0; cursor:not-allowed; }
+  .ghost-btn{ appearance:none; border:1px solid var(--border); background:#fff; color:var(--ink); font-family:'Inter',sans-serif;
+    font-weight:600; font-size:14px; padding:11px 18px; border-radius:10px; cursor:pointer; text-decoration:none; display:inline-block; }
+  .ghost-btn:hover{ border-color:var(--primary); color:var(--primary); }
+  .ghost-btn:disabled{ color:#C9CEDB; border-color:#E1E5F0; cursor:not-allowed; }
+
+  .settings-box{ margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
+  .settings-row{ display:flex; align-items:center; gap:10px; font-size:14px; margin-bottom:10px; flex-wrap:wrap; }
+  .settings-row input[type="checkbox"]{ width:16px; height:16px; accent-color:var(--primary); }
+  .settings-row select{ padding:7px 10px; border:1px solid var(--border); border-radius:8px; font-size:13.5px; background:#FBFCFE; }
+
+  .setup-actions{ margin-top:20px; display:flex; justify-content:flex-end; gap:10px; }
+
+  /* ---------- module select ---------- */
+  .module-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .module-card{ background:#F5F7FB; border:1.5px solid var(--border); border-radius:14px; padding:18px; text-align:left;
+    cursor:pointer; transition:border-color .15s ease, transform .12s ease; display:flex; flex-direction:column; gap:6px; }
+  .module-card:hover{ border-color:var(--primary); transform:translateY(-2px); }
+  .module-card .m-icon{ font-size:26px; }
+  .module-card .m-title{ font-weight:700; font-size:15px; color:var(--ink); }
+  .module-card .m-desc{ font-size:12.5px; color:var(--ink-soft); line-height:1.5; }
+  .module-card .m-badge{ display:inline-block; background:var(--primary-soft); color:var(--primary-dark); font-size:11.5px;
+    font-weight:700; padding:3px 9px; border-radius:10px; margin-top:2px; align-self:flex-start; }
+
+  .game-top{ margin-bottom:16px; font-size:13.5px; color:var(--ink-soft); font-weight:600; }
+  .meta-row{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+  .progress-track{ width:100%; height:6px; background:#E4E8F2; border-radius:4px; overflow:hidden; }
+  .progress-fill{ height:100%; background:linear-gradient(90deg,var(--primary),var(--amber)); border-radius:4px; transition:width .3s ease; }
+
+  /* ---------- flashcard ---------- */
+  .fc-card{ background:linear-gradient(180deg,#FFFDF8, var(--primary-soft)); border:1px solid #D8CDEE; border-radius:16px;
+    padding:28px 24px; text-align:center; margin-bottom:16px; }
+  .fc-word{ font-family:'Space Grotesk', monospace; font-weight:700; font-size:30px; color:var(--ink); }
+  .fc-phonetic{ font-family:'Space Grotesk', monospace; font-size:14px; color:var(--ink-soft); margin-top:4px; }
+  .fc-pos{ display:inline-block; margin-top:8px; background:var(--primary); color:#fff; font-size:11.5px; font-weight:700;
+    padding:2px 10px; border-radius:10px; }
+  .fc-reveal{ margin-top:16px; text-align:left; display:none; }
+  .fc-reveal.show{ display:block; }
+  .fc-meaning{ font-family:'Noto Serif KR', serif; font-size:17px; font-weight:600; color:#3A2E12; margin-bottom:8px; }
+  .fc-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+  .fc-chip{ background:#fff; border:1px solid var(--border); border-radius:12px; padding:3px 10px; font-size:12px; color:var(--ink-soft); }
+  .fc-example{ background:#F5F7FB; border-radius:10px; padding:12px 14px; margin-top:10px; font-family:'Space Grotesk', monospace;
+    font-size:14.5px; line-height:1.7; }
+  .fc-translation{ font-size:13px; color:var(--ink-soft); margin-top:6px; font-family:'Noto Serif KR', serif; }
+  .tap-word{ text-decoration:underline dotted; text-decoration-color:var(--primary); cursor:pointer; position:relative; color:var(--primary-dark); font-weight:700; }
+  .tap-tooltip{ position:absolute; z-index:50; background:var(--ink); color:#fff; font-size:12px; padding:8px 10px; border-radius:8px;
+    max-width:220px; line-height:1.5; box-shadow:0 6px 16px rgba(0,0,0,0.2); }
+  .fc-controls{ display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .fc-nav{ display:flex; justify-content:space-between; gap:10px; margin-top:14px; }
+
+  /* ---------- matching (module 2) ---------- */
+  .match-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px 14px; margin-bottom:20px; }
+  .match-card{ position:relative; font-family:'Inter', sans-serif; font-weight:600; font-size:14.5px; color:var(--ink);
+    background:#fff; border:1.5px solid var(--border); border-radius:14px; padding:14px 10px; min-height:56px; height:100%;
+    display:flex; align-items:center; justify-content:center; text-align:center; cursor:pointer; user-select:none;
+    box-shadow:0 4px 0 var(--border); transition:background .15s ease, border-color .15s ease, color .15s ease, transform .1s ease, box-shadow .1s ease, opacity .25s ease;
+    overflow:hidden; word-break:keep-all; }
+  .match-card:hover:not(.is-solved):not(.is-selected):not(.is-correct):not(.is-wrong){ border-color:var(--primary); }
+  .match-card.is-selected{ background:var(--primary-soft); border-color:var(--primary); color:var(--primary-dark); box-shadow:0 4px 0 var(--primary-dark); }
+  .match-card.is-correct{ background:var(--success-soft); border-color:var(--success); color:#245A27; box-shadow:0 4px 0 #2F7A30; animation:cardPop .45s ease; overflow:hidden; }
+  .match-card.is-correct::after{ content:''; position:absolute; top:0; left:-60%; width:45%; height:100%;
+    background:linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.85) 50%, transparent 100%); transform:skewX(-20deg); animation:shineSweep .6s ease forwards; }
+  .match-card.is-wrong{ background:var(--danger-soft); border-color:var(--danger); color:#7E2532; box-shadow:0 4px 0 #A83345; animation:cardShake .45s ease; }
+  .match-card.is-solved{ color:#DDE2EC; border-color:#EEF1F6; background:#fff; cursor:default; box-shadow:none; }
+  .match-card.is-solved::after{ content:none; }
+  @keyframes cardShake{ 0%,100%{transform:translateX(0);} 15%{transform:translateX(-7px);} 30%{transform:translateX(6px);} 45%{transform:translateX(-5px);} 60%{transform:translateX(4px);} 75%{transform:translateX(-2px);} }
+  @keyframes cardPop{ 0%{transform:scale(1);} 35%{transform:scale(1.07);} 65%{transform:scale(0.97);} 100%{transform:scale(1);} }
+  @keyframes shineSweep{ 0%{left:-60%;} 100%{left:130%;} }
+
+  /* ---------- cloze / confusable ---------- */
+  .quiz-card{ background:#F5F7FB; border:1px solid var(--border); border-radius:14px; padding:20px 22px; margin-bottom:18px; }
+  .quiz-sentence{ font-family:'Space Grotesk', monospace; font-size:16px; line-height:1.8; }
+  .quiz-blank{ display:inline-block; min-width:70px; border-bottom:2px solid var(--primary); color:var(--primary); font-weight:700; text-align:center; }
+  .quiz-translation{ font-size:13px; color:var(--ink-soft); margin-top:8px; font-family:'Noto Serif KR', serif; }
+  .quiz-choices{ display:flex; flex-direction:column; gap:10px; margin-top:16px; }
+  .choice-btn{ appearance:none; border:1.5px solid var(--border); background:#fff; border-radius:10px; padding:12px 16px;
+    font-size:14.5px; font-weight:600; text-align:left; cursor:pointer; transition:border-color .15s ease, background .15s ease; }
+  .choice-btn:hover:not(:disabled){ border-color:var(--primary); }
+  .choice-btn.correct{ background:var(--success-soft); border-color:var(--success); color:#245A27; }
+  .choice-btn.wrong{ background:var(--danger-soft); border-color:var(--danger); color:#7E2532; }
+  .choice-btn:disabled{ cursor:default; }
+  .hint-row{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .hint-box{ margin-top:10px; background:var(--amber-soft); border:1px solid #EAD4A0; border-radius:8px; padding:10px 12px; font-size:13px; display:none; }
+  .hint-box.show{ display:block; }
+  .exam-point-box{ margin-top:12px; background:var(--primary-soft); border:1px solid #D8CDEE; border-radius:8px; padding:10px 12px; font-size:12.5px; line-height:1.6; display:none; }
+  .exam-point-box.show{ display:block; }
+
+  /* ---------- review ---------- */
+  .rate-row{ display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .rate-btn{ flex:1; min-width:80px; appearance:none; border:1.5px solid var(--border); border-radius:10px; padding:12px 8px;
+    font-size:13px; font-weight:700; cursor:pointer; background:#fff; }
+  .rate-btn.again{ border-color:var(--danger); color:var(--danger); }
+  .rate-btn.hard{ border-color:var(--amber); color:#A9762A; }
+  .rate-btn.good{ border-color:var(--primary); color:var(--primary); }
+  .rate-btn.easy{ border-color:var(--success); color:var(--success); }
+  .rate-btn:hover{ transform:translateY(-1px); }
+
+  /* ---------- done screen ---------- */
+  .done-wrap{ text-align:center; padding:20px 4px; }
+  .done-wrap .big-score{ font-family:'Noto Serif KR', serif; font-size:32px; font-weight:700; color:var(--primary); margin:10px 0 4px; }
+  .stats-grid{ display:flex; justify-content:center; gap:14px; margin:20px 0 6px; flex-wrap:wrap; }
+  .stat-item{ background:#F5F7FB; border:1px solid var(--border); border-radius:12px; padding:14px 22px; min-width:130px; }
+  .stat-label{ font-size:12px; color:var(--ink-soft); font-weight:600; margin-bottom:6px; }
+  .stat-value{ font-family:'Space Grotesk', monospace; font-size:20px; font-weight:700; color:var(--primary); }
+  .done-actions{ margin-top:22px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .done-actions button, .done-actions a{ min-width:170px; }
+
+  @media (max-width:600px){
+    body{ padding:20px 12px 48px; }
+    .panel{ padding:18px; border-radius:14px; }
+    header.top h1{ font-size:22px; }
+    header.top .subtitle{ font-size:12px; }
+    .tab-btn{ flex:1; margin-right:0; text-align:center; padding:10px 2px; font-size:11.5px; }
+    .module-grid{ grid-template-columns:1fr; }
+    .fc-word{ font-size:24px; }
+    .stats-grid{ flex-direction:column; }
+    .stat-item{ width:100%; }
+    .setup-actions .primary-btn{ width:100%; }
+    .setup-actions{ justify-content:stretch; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="title-group">
+      <h1>TOEFL Voca Trainer</h1>
+      <div class="subtitle">단어·동의어·예문·혼동어휘까지, 5가지 방식으로 완전 정복</div>
+    </div>
+    <a class="home-link" href="index.html">🏠 게임 목록</a>
+  </header>
+
+  <!-- SETUP -->
+  <section class="panel" id="setup-panel">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="text">텍스트로 입력</button>
+      <button class="tab-btn" data-tab="excel">엑셀 업로드</button>
+      <button class="tab-btn" data-tab="github">깃허브에서 불러오기</button>
+    </div>
+
+    <div class="tab-content active" id="tab-text">
+      <textarea id="text-input" placeholder="disperse | 흩어지게 하다, 퍼뜨리다 | The smoke from the fire was rapidly dispersed by the strong winds. | 화재에서 발생한 연기는 강한 바람에 의해 빠르게 흩어졐다. | scatter, dissipate, spread"></textarea>
+      <p class="hint">형식: <code>단어 | 뜻 | 예문 | 예문 해석 | 동의어(쉼표 구분, 선택)</code>. 간단한 세트용이며, 전체 기능(발음기호·품사·출제포인트·혼동단어 등)은 엑셀 업로드를 이용하세요.</p>
+      <div style="margin-top:14px;"><button class="ghost-btn" id="parse-text-btn">단어 목록 불러오기</button></div>
+    </div>
+
+    <div class="tab-content" id="tab-excel">
+      <div class="file-drop">
+        엑셀 파일(.xlsx, .xls)을 선택하세요 (첫 줄은 제목 줄이어야 해요)<br>
+        <input type="file" id="excel-input" accept=".xlsx,.xls">
+      </div>
+      <div class="col-spec">
+        <b>필수 컬럼:</b> word(단어), meaning(뜻)<br>
+        <b>선택 컬럼:</b> phonetic(발음기호), pos(품사), synonyms(동의어, 쉼표구분), example(예문), translation(예문해석),
+        exam_point(출제포인트), confusable_word(혼동단어), blank_form(빈칸처리할 정확한 단어형태), derivatives(파생어, "품사:단어" 쉼표구분)<br>
+        컬럼 이름은 한글(단어/뜻/예문/해석/동의어/품사/발음/출제포인트/혼동단어 등)도 인식돼요.
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-github">
+      <div class="gh-field"><label for="gh-owner">사용자/조직</label><input type="text" id="gh-owner" placeholder="예: myid"></div>
+      <div class="gh-field"><label for="gh-repo">저장소</label><input type="text" id="gh-repo" placeholder="예: my-repo"></div>
+      <div class="gh-field"><label for="gh-path">폴더 경로</label><input type="text" id="gh-path" placeholder="비워두면 저장소 최상위 폴더"></div>
+      <div class="gh-field"><label for="gh-branch">브랜치</label><input type="text" id="gh-branch" placeholder="비워두면 기본 브랜치 사용"></div>
+      <p class="hint">공개(public) 저장소만 지원합니다. 이 폴더의 엑셀 파일(.xlsx, .xls) 목록이 모두 표시됩니다.</p>
+      <div style="margin-top:10px;"><button class="ghost-btn" id="gh-list-btn">엑셀 파일 목록 불러오기</button></div>
+      <div id="gh-file-list" class="gh-file-list is-hidden"></div>
+    </div>
+
+    <div id="parse-error" class="error-msg" style="display:none;"></div>
+
+    <div class="preview" id="preview-wrap" style="display:none;">
+      <div class="count">불러온 단어: <strong id="preview-count">0</strong>개</div>
+      <div class="preview-list" id="preview-list"></div>
+    </div>
+
+    <div class="settings-box">
+      <label class="settings-row"><input type="checkbox" id="sound-enable" checked> 정답/오답 효과음 재생하기</label>
+      <label class="settings-row"><input type="checkbox" id="autospeak-enable" checked> 카드 학습 시 단어 발음 자동 재생</label>
+      <div class="settings-row">
+        <label for="speech-lang" style="font-weight:600; color:var(--ink-soft);">발음 언어</label>
+        <select id="speech-lang">
+          <option value="en-US" selected>영어 (미국)</option>
+          <option value="en-GB">영어 (영국)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="setup-actions"><button class="primary-btn" id="start-btn" disabled>학습 시작하기</button></div>
+  </section>
+
+  <!-- MODULE SELECT -->
+  <section class="panel" id="module-panel" style="display:none;">
+    <div class="game-top">
+      <div class="meta-row"><span id="module-set-count">0개 단어 불러옴</span></div>
+    </div>
+    <div class="module-grid">
+      <div class="module-card" data-module="flashcard">
+        <div class="m-icon">📇</div>
+        <div class="m-title">① 카드 학습</div>
+        <div class="m-desc">단어·발음·뜻·예문을 순서대로 보며 익혀요.</div>
+      </div>
+      <div class="module-card" data-module="match">
+        <div class="m-icon">🔗</div>
+        <div class="m-title">② 동의어 매칭 게임</div>
+        <div class="m-desc">단어와 동의어를 짝지어 맞혀요.</div>
+      </div>
+      <div class="module-card" data-module="cloze">
+        <div class="m-icon">✏️</div>
+        <div class="m-title">③ 빈칸 채우기 퀴즈</div>
+        <div class="m-desc">예문 속 빈칸에 알맞은 단어를 골라요.</div>
+      </div>
+      <div class="module-card" data-module="confusable">
+        <div class="m-icon">⚠️</div>
+        <div class="m-title">④ 혼동 어휘 퀴즈</div>
+        <div class="m-desc">철자·발음이 비슷한 단어를 구분해요.</div>
+      </div>
+      <div class="module-card" data-module="review" style="grid-column:1 / -1;">
+        <div class="m-icon">🔁</div>
+        <div class="m-title">⑤ 오늘의 복습</div>
+        <div class="m-desc">시차 복습(에빙하우스 망각곡선) 알고리즘으로 오늘 복습할 단어만 모아 보여줘요. (이 기기에만 저장돼요)</div>
+        <span class="m-badge" id="review-due-badge">0개 복습 대기</span>
+      </div>
+    </div>
+    <div class="setup-actions" style="justify-content:flex-start; margin-top:18px;">
+      <button class="ghost-btn" id="back-to-setup-btn">다른 단어 세트 불러오기</button>
+    </div>
+  </section>
+
+  <!-- MODULE 1: FLASHCARD -->
+  <section class="panel" id="flashcard-panel" style="display:none;">
+    <div class="game-top">
+      <div class="meta-row"><span id="fc-progress">1 / 10</span><button class="ghost-btn" id="fc-menu-btn">메뉴로</button></div>
+      <div class="progress-track"><div class="progress-fill" id="fc-progress-fill" style="width:0%;"></div></div>
+    </div>
+    <div class="fc-card" id="fc-card">
+      <div class="fc-word" id="fc-word">-</div>
+      <div class="fc-phonetic" id="fc-phonetic"></div>
+      <div class="fc-pos" id="fc-pos" style="display:none;"></div>
+
+      <div class="fc-reveal" id="fc-meaning-block">
+        <div class="fc-meaning" id="fc-meaning"></div>
+        <div class="fc-chips" id="fc-synonyms"></div>
+        <div class="fc-chips" id="fc-derivatives"></div>
+      </div>
+      <div class="fc-reveal" id="fc-example-block">
+        <div class="fc-example" id="fc-example"></div>
+        <div class="fc-translation" id="fc-translation"></div>
+      </div>
+    </div>
+    <div class="fc-controls">
+      <button class="ghost-btn" id="fc-listen-btn">🔊 발음 듣기</button>
+      <button class="ghost-btn" id="fc-meaning-btn">💡 뜻 보기</button>
+      <button class="ghost-btn" id="fc-example-btn">📝 예문 보기</button>
+    </div>
+    <div class="fc-nav">
+      <button class="ghost-btn" id="fc-prev-btn">← 이전</button>
+      <button class="primary-btn" id="fc-next-btn">다음 →</button>
+    </div>
+  </section>
+
+  <!-- MODULE 2: MATCH -->
+  <section class="panel" id="match-panel" style="display:none;">
+    <div class="game-top">
+      <div class="meta-row"><span id="match-progress">0 / 0 단어</span><span id="match-mistakes">실수 0</span></div>
+      <div class="progress-track"><div class="progress-fill" id="match-progress-fill" style="width:0%;"></div></div>
+    </div>
+    <div class="match-grid" id="match-grid"></div>
+    <div class="setup-actions" style="justify-content:flex-start;"><button class="ghost-btn" id="match-menu-btn">메뉴로</button></div>
+  </section>
+
+  <!-- MODULE 3: CLOZE -->
+  <section class="panel" id="cloze-panel" style="display:none;">
+    <div class="game-top">
+      <div class="meta-row"><span id="cloze-progress">1 / 10</span><span id="cloze-score">맞음 0</span></div>
+      <div class="progress-track"><div class="progress-fill" id="cloze-progress-fill" style="width:0%;"></div></div>
+    </div>
+    <div class="quiz-card">
+      <div class="quiz-sentence" id="cloze-sentence">-</div>
+      <div class="quiz-translation" id="cloze-translation"></div>
+      <div class="hint-row">
+        <button class="ghost-btn" id="cloze-hint1-btn">💡 뜻 힌트</button>
+        <button class="ghost-btn" id="cloze-hint2-btn">🔤 동의어 힌트</button>
+      </div>
+      <div class="hint-box" id="cloze-hint-box"></div>
+    </div>
+    <div class="quiz-choices" id="cloze-choices"></div>
+    <div class="setup-actions" style="justify-content:space-between;">
+      <button class="ghost-btn" id="cloze-menu-btn">메뉴로</button>
+      <button class="primary-btn" id="cloze-next-btn" style="display:none;">다음 →</button>
+    </div>
+  </section>
+
+  <!-- MODULE 4: CONFUSABLE -->
+  <section class="panel" id="confusable-panel" style="display:none;">
+    <div class="game-top">
+      <div class="meta-row"><span id="conf-progress">1 / 10</span><span id="conf-score">맞음 0</span></div>
+      <div class="progress-track"><div class="progress-fill" id="conf-progress-fill" style="width:0%;"></div></div>
+    </div>
+    <div class="quiz-card">
+      <div class="quiz-sentence" id="conf-sentence">-</div>
+      <div class="quiz-translation" id="conf-translation"></div>
+    </div>
+    <div class="quiz-choices" id="conf-choices"></div>
+    <div class="exam-point-box" id="conf-exam-point"></div>
+    <div class="setup-actions" style="justify-content:space-between;">
+      <button class="ghost-btn" id="conf-menu-btn">메뉴로</button>
+      <button class="primary-btn" id="conf-next-btn" style="display:none;">다음 →</button>
+    </div>
+  </section>
+
+  <!-- MODULE 5: REVIEW -->
+  <section class="panel" id="review-panel" style="display:none;">
+    <div class="game-top">
+      <div class="meta-row"><span id="review-progress">1 / 10</span><button class="ghost-btn" id="review-menu-btn">메뉴로</button></div>
+      <div class="progress-track"><div class="progress-fill" id="review-progress-fill" style="width:0%;"></div></div>
+    </div>
+    <div class="fc-card">
+      <div class="fc-word" id="review-word">-</div>
+      <div class="fc-phonetic" id="review-phonetic"></div>
+      <div class="fc-reveal" id="review-answer-block">
+        <div class="fc-meaning" id="review-meaning"></div>
+        <div class="fc-example" id="review-example"></div>
+        <div class="fc-translation" id="review-translation"></div>
+      </div>
+    </div>
+    <div class="fc-controls">
+      <button class="ghost-btn" id="review-listen-btn">🔊 발음 듣기</button>
+      <button class="primary-btn" id="review-show-btn">정답 보기</button>
+    </div>
+    <div class="rate-row" id="review-rate-row" style="display:none;">
+      <button class="rate-btn again" data-q="0">다시</button>
+      <button class="rate-btn hard" data-q="3">어려움</button>
+      <button class="rate-btn good" data-q="4">보통</button>
+      <button class="rate-btn easy" data-q="5">쉬움</button>
+    </div>
+  </section>
+
+  <!-- GENERIC DONE -->
+  <section class="panel done-wrap" id="module-done-panel" style="display:none;">
+    <div class="m-icon" style="font-size:40px;">🎉</div>
+    <div class="big-score" id="done-title">완료!</div>
+    <div class="stats-grid" id="done-stats"></div>
+    <div class="done-actions">
+      <button class="primary-btn" id="done-retry-btn">다시 하기</button>
+      <button class="ghost-btn" id="done-menu-btn">모듈 메뉴로</button>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- state ----------
+  var vocabSet = [];
+  var soundEnabled = true;
+  var autoSpeakEnabled = true;
+  var speechLang = 'en-US';
+
+  // ---------- element refs: setup ----------
+  var setupPanel = document.getElementById('setup-panel');
+  var modulePanel = document.getElementById('module-panel');
+  var textInput = document.getElementById('text-input');
+  var excelInput = document.getElementById('excel-input');
+  var parseTextBtn = document.getElementById('parse-text-btn');
+  var parseError = document.getElementById('parse-error');
+  var previewWrap = document.getElementById('preview-wrap');
+  var previewCount = document.getElementById('preview-count');
+  var previewList = document.getElementById('preview-list');
+  var startBtn = document.getElementById('start-btn');
+  var soundEnableCb = document.getElementById('sound-enable');
+  var autospeakEnableCb = document.getElementById('autospeak-enable');
+  var speechLangSelect = document.getElementById('speech-lang');
+
+  var ghOwnerInput = document.getElementById('gh-owner');
+  var ghRepoInput = document.getElementById('gh-repo');
+  var ghPathInput = document.getElementById('gh-path');
+  var ghBranchInput = document.getElementById('gh-branch');
+  var ghListBtn = document.getElementById('gh-list-btn');
+  var ghFileList = document.getElementById('gh-file-list');
+
+  var moduleSetCount = document.getElementById('module-set-count');
+  var reviewDueBadge = document.getElementById('review-due-badge');
+  var backToSetupBtn = document.getElementById('back-to-setup-btn');
+
+  // ---------- tabs ----------
+  document.querySelectorAll('.tab-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+      document.querySelectorAll('.tab-content').forEach(function(c){ c.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------- helpers ----------
+  function shuffle(arr){
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+  function showError(msg){ parseError.textContent = msg; parseError.style.display = msg ? 'block' : 'none'; }
+  function escapeHtml(str){ var d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+  function showPanel(id){
+    ['setup-panel','module-panel','flashcard-panel','match-panel','cloze-panel','confusable-panel','review-panel','module-done-panel']
+      .forEach(function(p){ document.getElementById(p).style.display = (p === id) ? 'block' : 'none'; });
+  }
+
+  // ---------- inflection matching (shared by flashcard tooltip + cloze blanking) ----------
+  function inflectionCandidates(base){
+    var b = base.toLowerCase();
+    var set = {};
+    [b, b+'s', b+'es', b+'d', b+'ed', b+'ing'].forEach(function(c){ set[c]=true; });
+    if (/e$/.test(b)) set[b.slice(0,-1)+'ing'] = true;
+    if (/[^aeiou]y$/.test(b)){ set[b.slice(0,-1)+'ies'] = true; set[b.slice(0,-1)+'ied'] = true; }
+    return Object.keys(set);
+  }
+  function findInflectedIndex(tokensLower, base){
+    var cands = inflectionCandidates(base);
+    for (var i=0;i<tokensLower.length;i++){
+      var clean = tokensLower[i].replace(/[.,!?;:"'()]/g,'');
+      if (cands.indexOf(clean) !== -1) return i;
+    }
+    return -1;
+  }
+
+  // ---------- data parsing ----------
+  function parseDerivatives(text){
+    if (!text) return [];
+    return text.split(',').map(function(part){
+      part = part.trim();
+      if (!part) return null;
+      var idx = part.indexOf(':');
+      if (idx === -1) return { pos:'', word: part };
+      return { pos: part.slice(0,idx).trim(), word: part.slice(idx+1).trim() };
+    }).filter(Boolean);
+  }
+
+  function parseTextLines(text){
+    var lines = text.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean);
+    var result = [];
+    lines.forEach(function(line){
+      var parts = line.split('|').map(function(p){ return p.trim(); });
+      if (parts.length < 2) return;
+      var entry = {
+        word: parts[0] || '', phonetic:'', pos:'',
+        synonyms: parts[4] ? parts[4].split(',').map(function(s){ return s.trim(); }).filter(Boolean) : [],
+        meaning: parts[1] || '', example: parts[2] || '', translation: parts[3] || '',
+        examPoint:'', confusable:'', blankForm:'', derivatives:[]
+      };
+      if (entry.word && entry.meaning) result.push(entry);
+    });
+    return result;
+  }
+
+  function parseVocabWorkbookData(data){
+    var wb = XLSX.read(data, { type: 'array' });
+    var sheet = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    if (!rows.length) return { error: '시트가 비어있습니다.' };
+    var headerRow = rows[0].map(function(h){ return String(h).trim().toLowerCase(); });
+    function findCol(names){
+      for (var i=0;i<headerRow.length;i++){ if (names.indexOf(headerRow[i]) !== -1) return i; }
+      return -1;
+    }
+    var col = {
+      word: findCol(['word','단어','표제어']),
+      phonetic: findCol(['phonetic','발음','발음기호']),
+      pos: findCol(['pos','품사','part_of_speech']),
+      synonyms: findCol(['synonyms','synonym','동의어','유사단어']),
+      meaning: findCol(['meaning','뜻','의미']),
+      example: findCol(['example','example_sentence','예문']),
+      translation: findCol(['translation','example_translation','해석','번역','예문해석']),
+      examPoint: findCol(['exam_point','exampoint','출제포인트','최신출제포인트']),
+      confusable: findCol(['confusable','confusable_word','혼동단어']),
+      blankForm: findCol(['blank_form','blankform','빈칸단어']),
+      derivatives: findCol(['derivatives','파생어'])
+    };
+    if (col.word === -1 || col.meaning === -1){
+      return { error: '엑셀에서 word(단어)와 meaning(뜻) 컬럼을 찾지 못했습니다. 첫 줄이 제목 줄인지 확인해주세요.' };
+    }
+    var result = [];
+    for (var r=1;r<rows.length;r++){
+      var row = rows[r];
+      var word = String(row[col.word] || '').trim();
+      if (!word) continue;
+      var meaning = String(row[col.meaning] || '').trim();
+      if (!meaning) continue;
+      result.push({
+        word: word,
+        phonetic: col.phonetic>=0 ? String(row[col.phonetic]||'').trim() : '',
+        pos: col.pos>=0 ? String(row[col.pos]||'').trim() : '',
+        synonyms: col.synonyms>=0 ? String(row[col.synonyms]||'').split(',').map(function(s){return s.trim();}).filter(Boolean) : [],
+        meaning: meaning,
+        example: col.example>=0 ? String(row[col.example]||'').trim() : '',
+        translation: col.translation>=0 ? String(row[col.translation]||'').trim() : '',
+        examPoint: col.examPoint>=0 ? String(row[col.examPoint]||'').trim() : '',
+        confusable: col.confusable>=0 ? String(row[col.confusable]||'').trim() : '',
+        blankForm: col.blankForm>=0 ? String(row[col.blankForm]||'').trim() : '',
+        derivatives: col.derivatives>=0 ? parseDerivatives(String(row[col.derivatives]||'')) : []
+      });
+    }
+    if (!result.length) return { error: '유효한 단어 데이터를 찾지 못했습니다.' };
+    return { data: result };
+  }
+
+  function setVocabSet(list){
+    vocabSet = list;
+    if (!list.length){ previewWrap.style.display = 'none'; startBtn.disabled = true; return; }
+    previewWrap.style.display = 'block';
+    previewCount.textContent = list.length;
+    previewList.innerHTML = '';
+    list.slice(0, 8).forEach(function(w){
+      var row = document.createElement('div');
+      row.className = 'preview-row';
+      row.innerHTML = '<div class="w">' + escapeHtml(w.word) + '</div><div class="m">' + escapeHtml(w.meaning) + '</div>';
+      previewList.appendChild(row);
+    });
+    if (list.length > 8){
+      var more = document.createElement('div');
+      more.style.cssText = 'font-size:12px;color:var(--ink-soft);';
+      more.textContent = '... 외 ' + (list.length - 8) + '개';
+      previewList.appendChild(more);
+    }
+    startBtn.disabled = false;
+  }
+
+  parseTextBtn.addEventListener('click', function(){
+    showError('');
+    var result = parseTextLines(textInput.value);
+    if (!result.length){
+      showError('단어를 인식하지 못했습니다. "단어 | 뜻 | 예문 | 해석 | 동의어" 형식을 확인해주세요.');
+      setVocabSet([]);
+      return;
+    }
+    setVocabSet(result);
+  });
+
+  excelInput.addEventListener('change', function(e){
+    showError('');
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(evt){
+      try {
+        var data = new Uint8Array(evt.target.result);
+        var res = parseVocabWorkbookData(data);
+        if (res.error){ showError(res.error); setVocabSet([]); return; }
+        setVocabSet(res.data);
+      } catch (err){ showError('엑셀 파일을 읽는 중 오류가 발생했습니다.'); setVocabSet([]); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // ---------- GitHub browsing ----------
+  (function autoDetectGithub(){
+    try {
+      var host = location.hostname;
+      if (host.indexOf('.github.io') === -1) return;
+      var owner = host.split('.')[0];
+      var parts = location.pathname.split('/').filter(Boolean);
+      var repo = parts.length ? parts[0] : '';
+      var folderParts = parts.slice(1);
+      if (folderParts.length && folderParts[folderParts.length - 1].indexOf('.') !== -1) folderParts = folderParts.slice(0, -1);
+      ghOwnerInput.value = owner; ghRepoInput.value = repo; ghPathInput.value = folderParts.join('/');
+    } catch (err) {}
+  })();
+
+  function setGhFileListContent(html){ ghFileList.innerHTML = html; ghFileList.classList.remove('is-hidden'); }
+
+  ghListBtn.addEventListener('click', function(){
+    showError('');
+    var owner = ghOwnerInput.value.trim(), repo = ghRepoInput.value.trim();
+    var path = ghPathInput.value.trim().replace(/^\/+|\/+$/g, '');
+    var branch = ghBranchInput.value.trim();
+    if (!owner || !repo){ ghFileList.classList.add('is-hidden'); showError('GitHub 사용자명과 저장소 이름을 입력해주세요.'); return; }
+    setGhFileListContent('<div class="gh-file-note">불러오는 중...</div>');
+    var apiUrl = 'https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/contents';
+    if (path) apiUrl += '/' + path.split('/').map(encodeURIComponent).join('/');
+    if (branch) apiUrl += '?ref=' + encodeURIComponent(branch);
+    fetch(apiUrl, { headers: { 'Accept': 'application/vnd.github+json' } })
+      .then(function(res){
+        if (!res.ok){
+          if (res.status === 404) throw new Error('저장소나 폴더를 찾을 수 없습니다.');
+          if (res.status === 403) throw new Error('GitHub API 요청 한도를 초과했습니다.');
+          throw new Error('GitHub에서 파일 목록을 가져오지 못했습니다.');
+        }
+        return res.json();
+      })
+      .then(function(items){
+        if (!Array.isArray(items)) throw new Error('입력한 경로가 폴더가 아닙니다.');
+        renderGhFileList(items.filter(function(it){ return it.type==='file' && /\.(xlsx|xls)$/i.test(it.name); }));
+      })
+      .catch(function(err){ ghFileList.classList.add('is-hidden'); ghFileList.innerHTML=''; showError(err.message || '오류가 발생했습니다.'); });
+  });
+
+  function renderGhFileList(files){
+    if (!files.length){ setGhFileListContent('<div class="gh-file-note">이 폴더에서 엑셀 파일을 찾지 못했습니다.</div>'); return; }
+    ghFileList.innerHTML = '';
+    files.forEach(function(file){
+      var row = document.createElement('div');
+      row.className = 'gh-file-row';
+      row.innerHTML = '<span class="name">' + escapeHtml(file.name) + '</span><span class="pick">불러오기 →</span>';
+      row.addEventListener('click', function(){ loadGhFile(file, row); });
+      ghFileList.appendChild(row);
+    });
+    ghFileList.classList.remove('is-hidden');
+  }
+
+  function loadGhFile(file, row){
+    showError('');
+    var pickLabel = row.querySelector('.pick');
+    if (pickLabel) pickLabel.textContent = '불러오는 중...';
+    fetch(file.download_url).then(function(res){
+      if (!res.ok) throw new Error('파일을 다운로드하지 못했습니다.');
+      return res.arrayBuffer();
+    }).then(function(buf){
+      var res = parseVocabWorkbookData(new Uint8Array(buf));
+      if (res.error){ showError(res.error); setVocabSet([]); return; }
+      setVocabSet(res.data);
+    }).catch(function(err){ showError(err.message || '파일을 불러오는 중 오류가 발생했습니다.'); })
+      .then(function(){ if (pickLabel) pickLabel.textContent = '불러오기 →'; });
+  }
+
+  // ---------- sound effects ----------
+  var audioCtx = null;
+  function getAudioCtx(){
+    if (!audioCtx){ try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ audioCtx=null; } }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+  function playTone(ctx, freq, startOffset, duration, type, peakGain){
+    var osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    var t0 = ctx.currentTime + startOffset;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(peakGain, t0 + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0 + duration + 0.03);
+  }
+  function playBellNote(ctx, freq, startOffset, duration, peakGain){
+    playTone(ctx, freq, startOffset, duration, 'sine', peakGain);
+    playTone(ctx, freq*2, startOffset, duration*0.55, 'sine', peakGain*0.35);
+    playTone(ctx, freq*3, startOffset, duration*0.35, 'triangle', peakGain*0.12);
+  }
+  function playCorrectSound(){
+    if (!soundEnabled) return;
+    var ctx = getAudioCtx(); if (!ctx) return;
+    playBellNote(ctx, 1046.50, 0.00, 0.16, 0.26);
+    playBellNote(ctx, 1318.51, 0.08, 0.16, 0.26);
+    playBellNote(ctx, 1567.98, 0.16, 0.30, 0.30);
+  }
+  function playWrongSound(){
+    if (!soundEnabled) return;
+    var ctx = getAudioCtx(); if (!ctx) return;
+    playTone(ctx, 180, 0, 0.30, 'sawtooth', 0.16);
+    playTone(ctx, 170, 0, 0.30, 'square', 0.10);
+  }
+
+  // ---------- TTS ----------
+  function speakText(text){
+    if (!('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      var utter = new SpeechSynthesisUtterance(text);
+      utter.lang = speechLang; utter.rate = 0.92;
+      window.speechSynthesis.speak(utter);
+    } catch(e){}
+  }
+
+  // ---------- SRS (SM-2 lite) via localStorage ----------
+  var SRS_PREFIX = 'toefl_voca_srs::';
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+  function getSrs(word){
+    try { var raw = localStorage.getItem(SRS_PREFIX + word.toLowerCase()); return raw ? JSON.parse(raw) : null; }
+    catch(e){ return null; }
+  }
+  function setSrs(word, rec){
+    try { localStorage.setItem(SRS_PREFIX + word.toLowerCase(), JSON.stringify(rec)); } catch(e){}
+  }
+  function isDue(word){
+    var rec = getSrs(word);
+    if (!rec) return true;
+    return rec.dueDate <= todayStr();
+  }
+  function computeDueList(){ return vocabSet.filter(function(w){ return isDue(w.word); }); }
+  function updateSrs(word, quality){
+    var rec = getSrs(word) || { efactor:2.5, interval:0, repetitions:0 };
+    if (quality < 3){ rec.repetitions = 0; rec.interval = 1; }
+    else {
+      rec.repetitions++;
+      if (rec.repetitions === 1) rec.interval = 1;
+      else if (rec.repetitions === 2) rec.interval = 6;
+      else rec.interval = Math.round(rec.interval * rec.efactor);
+      rec.efactor = Math.max(1.3, rec.efactor + (0.1 - (5-quality)*(0.08+(5-quality)*0.02)));
+    }
+    var due = new Date(); due.setDate(due.getDate() + rec.interval);
+    rec.dueDate = due.toISOString().slice(0,10);
+    rec.lastReviewed = todayStr();
+    setSrs(word, rec);
+  }
+
+  // ================= START / MODULE MENU =================
+  startBtn.addEventListener('click', function(){
+    if (!vocabSet.length) return;
+    soundEnabled = soundEnableCb.checked;
+    autoSpeakEnabled = autospeakEnableCb.checked;
+    speechLang = speechLangSelect.value;
+    showModuleMenu();
+  });
+
+  function showModuleMenu(){
+    moduleSetCount.textContent = vocabSet.length + '개 단어 불러옴';
+    reviewDueBadge.textContent = computeDueList().length + '개 복습 대기';
+    showPanel('module-panel');
+  }
+
+  document.querySelectorAll('.module-card').forEach(function(card){
+    card.addEventListener('click', function(){
+      var m = card.dataset.module;
+      if (m === 'flashcard') startFlashcard();
+      else if (m === 'match') startMatch();
+      else if (m === 'cloze') startCloze();
+      else if (m === 'confusable') startConfusable();
+      else if (m === 'review') startReview();
+    });
+  });
+
+  backToSetupBtn.addEventListener('click', function(){ showPanel('setup-panel'); });
+
+  // generic "menu" buttons
+  ['fc-menu-btn','match-menu-btn','cloze-menu-btn','conf-menu-btn','review-menu-btn'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('click', showModuleMenu);
+  });
+
+  var doneRetryBtn = document.getElementById('done-retry-btn');
+  var doneMenuBtn = document.getElementById('done-menu-btn');
+  var doneRetryHandler = null;
+  doneMenuBtn.addEventListener('click', showModuleMenu);
+  doneRetryBtn.addEventListener('click', function(){ if (doneRetryHandler) doneRetryHandler(); });
+
+  function showDone(title, stats, retryHandler){
+    document.getElementById('done-title').textContent = title;
+    var statsEl = document.getElementById('done-stats');
+    statsEl.innerHTML = '';
+    stats.forEach(function(s){
+      var item = document.createElement('div');
+      item.className = 'stat-item';
+      item.innerHTML = '<div class="stat-label">' + escapeHtml(s.label) + '</div><div class="stat-value">' + escapeHtml(s.value) + '</div>';
+      statsEl.appendChild(item);
+    });
+    doneRetryHandler = retryHandler;
+    showPanel('module-done-panel');
+  }
+
+  // ================= MODULE 1: FLASHCARD =================
+  var fcOrder = [], fcIndex = 0;
+  var fcWordEl = document.getElementById('fc-word');
+  var fcPhoneticEl = document.getElementById('fc-phonetic');
+  var fcPosEl = document.getElementById('fc-pos');
+  var fcMeaningBlock = document.getElementById('fc-meaning-block');
+  var fcMeaningEl = document.getElementById('fc-meaning');
+  var fcSynonymsEl = document.getElementById('fc-synonyms');
+  var fcDerivativesEl = document.getElementById('fc-derivatives');
+  var fcExampleBlock = document.getElementById('fc-example-block');
+  var fcExampleEl = document.getElementById('fc-example');
+  var fcTranslationEl = document.getElementById('fc-translation');
+  var fcProgressEl = document.getElementById('fc-progress');
+  var fcProgressFill = document.getElementById('fc-progress-fill');
+
+  function startFlashcard(){
+    fcOrder = vocabSet.map(function(_,i){ return i; });
+    fcIndex = 0;
+    showPanel('flashcard-panel');
+    renderFlashcard();
+  }
+
+  function renderFlashcard(){
+    var w = vocabSet[fcOrder[fcIndex]];
+    fcWordEl.textContent = w.word;
+    fcPhoneticEl.textContent = w.phonetic || '';
+    if (w.pos){ fcPosEl.textContent = w.pos; fcPosEl.style.display='inline-block'; } else { fcPosEl.style.display='none'; }
+    fcMeaningBlock.classList.remove('show');
+    fcExampleBlock.classList.remove('show');
+    fcMeaningEl.textContent = w.meaning;
+    fcSynonymsEl.innerHTML = w.synonyms.map(function(s){ return '<span class="fc-chip">' + escapeHtml(s) + '</span>'; }).join('');
+    fcDerivativesEl.innerHTML = (w.derivatives||[]).map(function(d){
+      return '<span class="fc-chip">' + (d.pos? escapeHtml(d.pos)+'. ':'') + escapeHtml(d.word) + '</span>';
+    }).join('');
+
+    if (w.example){
+      var tokens = w.example.split(/\s+/);
+      var tokensLower = tokens.map(function(t){ return t.toLowerCase(); });
+      var hitIdx = findInflectedIndex(tokensLower, w.word);
+      fcExampleEl.innerHTML = tokens.map(function(tok, i){
+        if (i === hitIdx){
+          return '<span class="tap-word" data-tip="' + escapeHtml(w.word + ' — ' + w.meaning) + '">' + escapeHtml(tok) + '</span>';
+        }
+        return escapeHtml(tok);
+      }).join(' ');
+    } else {
+      fcExampleEl.textContent = '(예문 없음)';
+    }
+    fcTranslationEl.textContent = w.translation || '';
+
+    fcProgressEl.textContent = (fcIndex+1) + ' / ' + fcOrder.length;
+    fcProgressFill.style.width = Math.round((fcIndex/fcOrder.length)*100) + '%';
+
+    if (autoSpeakEnabled) setTimeout(function(){ speakText(w.word); }, 200);
+  }
+
+  document.getElementById('fc-listen-btn').addEventListener('click', function(){
+    var w = vocabSet[fcOrder[fcIndex]];
+    speakText(w.word);
+  });
+  document.getElementById('fc-meaning-btn').addEventListener('click', function(){ fcMeaningBlock.classList.toggle('show'); });
+  document.getElementById('fc-example-btn').addEventListener('click', function(){
+    fcExampleBlock.classList.toggle('show');
+    if (fcExampleBlock.classList.contains('show')){
+      var w = vocabSet[fcOrder[fcIndex]];
+      if (w.example) setTimeout(function(){ speakText(w.example); }, 150);
+    }
+  });
+  fcExampleEl.addEventListener('click', function(e){
+    if (!e.target.classList.contains('tap-word')) return;
+    var existing = document.querySelector('.tap-tooltip');
+    if (existing) existing.remove();
+    var tip = document.createElement('div');
+    tip.className = 'tap-tooltip';
+    tip.textContent = e.target.dataset.tip;
+    document.body.appendChild(tip);
+    var rect = e.target.getBoundingClientRect();
+    tip.style.left = Math.max(8, rect.left) + 'px';
+    tip.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+    setTimeout(function(){ if (tip.parentNode) tip.remove(); }, 2500);
+  });
+  document.getElementById('fc-prev-btn').addEventListener('click', function(){
+    if (fcIndex > 0){ fcIndex--; renderFlashcard(); }
+  });
+  document.getElementById('fc-next-btn').addEventListener('click', function(){
+    if (fcIndex < fcOrder.length - 1){ fcIndex++; renderFlashcard(); }
+    else {
+      showDone('카드 학습 완료! 📇', [{label:'학습한 단어', value: fcOrder.length + '개'}], startFlashcard);
+    }
+  });
+
+  // ================= MODULE 2: SYNONYM MATCH =================
+  var MATCH_BATCH_SIZE = 4;
+  var matchBatches = [], matchBatchIndex = 0, matchCurrentBatch = [];
+  var matchLeftCards = [], matchRightCards = [];
+  var matchSelectedLeft = null, matchSelectedRight = null;
+  var matchSolvedTotal = 0, matchTotalWords = 0, matchMistakes = 0, matchInputLocked = false;
+  var matchGridEl = document.getElementById('match-grid');
+  var matchProgressEl = document.getElementById('match-progress');
+  var matchMistakesEl = document.getElementById('match-mistakes');
+  var matchProgressFill = document.getElementById('match-progress-fill');
+
+  function startMatch(){
+    var eligible = vocabSet.filter(function(w){ return w.synonyms && w.synonyms.length; });
+    if (!eligible.length){
+      showDone('동의어 데이터가 없어요', [{label:'안내', value:'synonyms 컬럼을 채워주세요'}], showModuleMenu);
+      return;
+    }
+    var shuffled = shuffle(eligible);
+    matchBatches = [];
+    for (var i=0;i<shuffled.length;i+=MATCH_BATCH_SIZE) matchBatches.push(shuffled.slice(i, i+MATCH_BATCH_SIZE));
+    matchBatchIndex = 0; matchSolvedTotal = 0; matchTotalWords = shuffled.length; matchMistakes = 0;
+    showPanel('match-panel');
+    loadMatchBatch();
+  }
+
+  function loadMatchBatch(){
+    matchCurrentBatch = matchBatches[matchBatchIndex];
+    matchSelectedLeft = null; matchSelectedRight = null; matchInputLocked = false;
+    matchLeftCards = shuffle(matchCurrentBatch.map(function(w, i){
+      return { id:'L'+i+'_'+Math.random().toString(36).slice(2), pairId:i, text:w.word, solved:false, flash:null };
+    }));
+    matchRightCards = shuffle(matchCurrentBatch.map(function(w, i){
+      var label = w.synonyms.slice(0,2).join(', ') || w.meaning;
+      return { id:'R'+i+'_'+Math.random().toString(36).slice(2), pairId:i, text:label, solved:false, flash:null };
+    }));
+    renderMatchGrid();
+    updateMatchProgress();
+  }
+
+  function updateMatchProgress(){
+    matchProgressEl.textContent = matchSolvedTotal + ' / ' + matchTotalWords + ' 단어';
+    matchMistakesEl.textContent = '실수 ' + matchMistakes;
+    matchProgressFill.style.width = (matchTotalWords ? Math.round((matchSolvedTotal/matchTotalWords)*100) : 0) + '%';
+  }
+
+  function renderMatchGrid(){
+    matchGridEl.innerHTML = '';
+    for (var i=0;i<matchLeftCards.length;i++){
+      matchGridEl.appendChild(makeMatchCard(matchLeftCards[i], 'left'));
+      matchGridEl.appendChild(makeMatchCard(matchRightCards[i], 'right'));
+    }
+  }
+
+  function makeMatchCard(card, side){
+    var el = document.createElement('button');
+    el.type = 'button';
+    var cls = 'match-card';
+    if (card.solved) cls += ' is-solved';
+    else if (card.flash === 'correct') cls += ' is-correct';
+    else if (card.flash === 'wrong') cls += ' is-wrong';
+    else if ((side==='left' && card.id===matchSelectedLeft) || (side==='right' && card.id===matchSelectedRight)) cls += ' is-selected';
+    el.className = cls;
+    el.textContent = card.text;
+    el.addEventListener('click', function(){ onMatchCardClick(card, side); });
+    return el;
+  }
+
+  function onMatchCardClick(card, side){
+    if (matchInputLocked || card.solved || card.flash) return;
+    if (side === 'left') matchSelectedLeft = (matchSelectedLeft === card.id) ? null : card.id;
+    else matchSelectedRight = (matchSelectedRight === card.id) ? null : card.id;
+    renderMatchGrid();
+    if (matchSelectedLeft && matchSelectedRight) checkMatch();
+  }
+
+  function checkMatch(){
+    var L = matchLeftCards.find(function(c){ return c.id===matchSelectedLeft; });
+    var R = matchRightCards.find(function(c){ return c.id===matchSelectedRight; });
+    if (!L || !R) return;
+    matchInputLocked = true;
+    if (L.pairId === R.pairId){
+      L.flash = 'correct'; R.flash = 'correct';
+      playCorrectSound();
+      renderMatchGrid();
+      setTimeout(function(){
+        L.solved = true; R.solved = true; L.flash = null; R.flash = null;
+        matchSelectedLeft = null; matchSelectedRight = null;
+        matchSolvedTotal++; matchInputLocked = false;
+        renderMatchGrid(); updateMatchProgress();
+        var batchDone = matchLeftCards.every(function(c){ return c.solved; });
+        if (batchDone){
+          matchInputLocked = true;
+          setTimeout(function(){
+            matchBatchIndex++;
+            if (matchBatchIndex >= matchBatches.length){
+              showDone('동의어 매칭 완료! 🔗', [
+                {label:'전체 단어', value: matchTotalWords + '개'},
+                {label:'실수 횟수', value: matchMistakes + '회'}
+              ], startMatch);
+            } else { loadMatchBatch(); }
+          }, 450);
+        }
+      }, 550);
+    } else {
+      matchMistakes++; updateMatchProgress();
+      L.flash = 'wrong'; R.flash = 'wrong';
+      playWrongSound();
+      renderMatchGrid();
+      setTimeout(function(){
+        L.flash=null; R.flash=null; matchSelectedLeft=null; matchSelectedRight=null;
+        matchInputLocked = false; renderMatchGrid();
+      }, 480);
+    }
+  }
+
+  // ================= MODULE 3: CLOZE =================
+  var clozeItems = [], clozeIndex = 0, clozeScore = 0, clozeAnswered = false;
+  var clozeSentenceEl = document.getElementById('cloze-sentence');
+  var clozeTranslationEl = document.getElementById('cloze-translation');
+  var clozeChoicesEl = document.getElementById('cloze-choices');
+  var clozeProgressEl = document.getElementById('cloze-progress');
+  var clozeScoreEl = document.getElementById('cloze-score');
+  var clozeProgressFill = document.getElementById('cloze-progress-fill');
+  var clozeHintBox = document.getElementById('cloze-hint-box');
+  var clozeNextBtn = document.getElementById('cloze-next-btn');
+
+  function buildClozeTarget(w){
+    if (!w.example) return null;
+    var tokens = w.example.split(/\s+/);
+    var tokensLower = tokens.map(function(t){ return t.toLowerCase(); });
+    var idx = -1;
+    if (w.blankForm){
+      idx = tokensLower.indexOf(w.blankForm.toLowerCase());
+      if (idx === -1){
+        var cleanBlank = w.blankForm.toLowerCase();
+        for (var i=0;i<tokensLower.length;i++){
+          if (tokensLower[i].replace(/[.,!?;:"'()]/g,'') === cleanBlank){ idx = i; break; }
+        }
+      }
+    }
+    if (idx === -1) idx = findInflectedIndex(tokensLower, w.word);
+    if (idx === -1) return null;
+    return { tokens: tokens, idx: idx, answerForm: tokens[idx].replace(/[.,!?;:"'()]/g,'') };
+  }
+
+  function startCloze(){
+    var items = [];
+    vocabSet.forEach(function(w){
+      var target = buildClozeTarget(w);
+      if (target) items.push({ word: w, target: target });
+    });
+    if (!items.length){
+      showDone('빈칸 퀴즈용 예문이 없어요', [{label:'안내', value:'example 컬럼을 확인해주세요'}], showModuleMenu);
+      return;
+    }
+    clozeItems = shuffle(items);
+    clozeIndex = 0; clozeScore = 0;
+    showPanel('cloze-panel');
+    loadClozeQuestion();
+  }
+
+  function loadClozeQuestion(){
+    clozeAnswered = false;
+    clozeNextBtn.style.display = 'none';
+    clozeHintBox.classList.remove('show');
+    var item = clozeItems[clozeIndex];
+    var w = item.word, t = item.target;
+    var displayTokens = t.tokens.map(function(tok, i){
+      return i === t.idx ? '<span class="quiz-blank">＿＿＿＿</span>' : escapeHtml(tok);
+    });
+    clozeSentenceEl.innerHTML = displayTokens.join(' ');
+    clozeTranslationEl.textContent = w.translation || '';
+    clozeProgressEl.textContent = (clozeIndex+1) + ' / ' + clozeItems.length;
+    clozeScoreEl.textContent = '맞음 ' + clozeScore;
+    clozeProgressFill.style.width = Math.round((clozeIndex/clozeItems.length)*100) + '%';
+
+    var correctAnswer = w.word;
+    var distractors = shuffle(vocabSet.filter(function(o){ return o.word.toLowerCase() !== w.word.toLowerCase(); }))
+      .slice(0, 3).map(function(o){ return o.word; });
+    var choices = shuffle([correctAnswer].concat(distractors));
+
+    clozeChoicesEl.innerHTML = '';
+    choices.forEach(function(choice){
+      var btn = document.createElement('button');
+      btn.className = 'choice-btn';
+      btn.textContent = choice;
+      btn.addEventListener('click', function(){ onClozeChoice(choice, correctAnswer, btn); });
+      clozeChoicesEl.appendChild(btn);
+    });
+  }
+
+  function onClozeChoice(choice, correctAnswer, btn){
+    if (clozeAnswered) return;
+    clozeAnswered = true;
+    var isCorrect = choice.toLowerCase() === correctAnswer.toLowerCase();
+    clozeChoicesEl.querySelectorAll('.choice-btn').forEach(function(b){
+      b.disabled = true;
+      if (b.textContent.toLowerCase() === correctAnswer.toLowerCase()) b.classList.add('correct');
+      else if (b === btn) b.classList.add('wrong');
+    });
+    if (isCorrect){ clozeScore++; playCorrectSound(); } else { playWrongSound(); }
+    clozeScoreEl.textContent = '맞음 ' + clozeScore;
+    clozeNextBtn.style.display = 'inline-block';
+    clozeNextBtn.textContent = (clozeIndex >= clozeItems.length - 1) ? '결과 확인' : '다음 →';
+  }
+
+  document.getElementById('cloze-hint1-btn').addEventListener('click', function(){
+    var w = clozeItems[clozeIndex].word;
+    clozeHintBox.textContent = '💡 ' + w.meaning + ' (첫 글자: ' + w.word.charAt(0).toUpperCase() + ')';
+    clozeHintBox.classList.add('show');
+  });
+  document.getElementById('cloze-hint2-btn').addEventListener('click', function(){
+    var w = clozeItems[clozeIndex].word;
+    var syn = w.synonyms && w.synonyms.length ? w.synonyms[0] : '(동의어 정보 없음)';
+    clozeHintBox.textContent = '🔤 동의어 힌트: ' + syn;
+    clozeHintBox.classList.add('show');
+  });
+  clozeNextBtn.addEventListener('click', function(){
+    clozeIndex++;
+    if (clozeIndex >= clozeItems.length){
+      showDone('빈칸 채우기 완료! ✏️', [
+        {label:'정답', value: clozeScore + ' / ' + clozeItems.length},
+        {label:'정확도', value: Math.round((clozeScore/clozeItems.length)*100) + '%'}
+      ], startCloze);
+    } else { loadClozeQuestion(); }
+  });
+
+  // ================= MODULE 4: CONFUSABLE =================
+  var confItems = [], confIndex = 0, confScore = 0, confAnswered = false;
+  var confSentenceEl = document.getElementById('conf-sentence');
+  var confTranslationEl = document.getElementById('conf-translation');
+  var confChoicesEl = document.getElementById('conf-choices');
+  var confProgressEl = document.getElementById('conf-progress');
+  var confScoreEl = document.getElementById('conf-score');
+  var confProgressFill = document.getElementById('conf-progress-fill');
+  var confExamPointEl = document.getElementById('conf-exam-point');
+  var confNextBtn = document.getElementById('conf-next-btn');
+
+  function startConfusable(){
+    var items = [];
+    vocabSet.forEach(function(w){
+      if (!w.confusable) return;
+      var target = buildClozeTarget(w);
+      items.push({ word: w, target: target });
+    });
+    if (!items.length){
+      showDone('혼동 단어 데이터가 없어요', [{label:'안내', value:'confusable_word 컬럼을 채워주세요'}], showModuleMenu);
+      return;
+    }
+    confItems = shuffle(items);
+    confIndex = 0; confScore = 0;
+    showPanel('confusable-panel');
+    loadConfQuestion();
+  }
+
+  function loadConfQuestion(){
+    confAnswered = false;
+    confNextBtn.style.display = 'none';
+    confExamPointEl.classList.remove('show');
+    var item = confItems[confIndex];
+    var w = item.word, t = item.target;
+
+    if (t){
+      var displayTokens = t.tokens.map(function(tok, i){
+        return i === t.idx ? '<span class="quiz-blank">＿＿＿＿</span>' : escapeHtml(tok);
+      });
+      confSentenceEl.innerHTML = displayTokens.join(' ');
+    } else {
+      confSentenceEl.innerHTML = escapeHtml(w.meaning) + ' — <span class="quiz-blank">＿＿＿＿</span>';
+    }
+    confTranslationEl.textContent = w.translation || '';
+    confProgressEl.textContent = (confIndex+1) + ' / ' + confItems.length;
+    confScoreEl.textContent = '맞음 ' + confScore;
+    confProgressFill.style.width = Math.round((confIndex/confItems.length)*100) + '%';
+
+    var choices = shuffle([w.word, w.confusable]);
+    confChoicesEl.innerHTML = '';
+    choices.forEach(function(choice){
+      var btn = document.createElement('button');
+      btn.className = 'choice-btn';
+      btn.textContent = choice;
+      btn.addEventListener('click', function(){ onConfChoice(choice, w, btn); });
+      confChoicesEl.appendChild(btn);
+    });
+  }
+
+  function onConfChoice(choice, w, btn){
+    if (confAnswered) return;
+    confAnswered = true;
+    var isCorrect = choice.toLowerCase() === w.word.toLowerCase();
+    confChoicesEl.querySelectorAll('.choice-btn').forEach(function(b){
+      b.disabled = true;
+      if (b.textContent.toLowerCase() === w.word.toLowerCase()) b.classList.add('correct');
+      else if (b === btn) b.classList.add('wrong');
+    });
+    if (isCorrect){ confScore++; playCorrectSound(); } else { playWrongSound(); }
+    confScoreEl.textContent = '맞음 ' + confScore;
+    if (w.examPoint){ confExamPointEl.textContent = '📌 ' + w.examPoint; confExamPointEl.classList.add('show'); }
+    confNextBtn.style.display = 'inline-block';
+    confNextBtn.textContent = (confIndex >= confItems.length - 1) ? '결과 확인' : '다음 →';
+  }
+
+  confNextBtn.addEventListener('click', function(){
+    confIndex++;
+    if (confIndex >= confItems.length){
+      showDone('혼동 어휘 퀴즈 완료! ⚠️', [
+        {label:'정답', value: confScore + ' / ' + confItems.length},
+        {label:'정확도', value: Math.round((confScore/confItems.length)*100) + '%'}
+      ], startConfusable);
+    } else { loadConfQuestion(); }
+  });
+
+  // ================= MODULE 5: REVIEW =================
+  var reviewList = [], reviewIndex = 0, reviewRevealed = false;
+  var reviewWordEl = document.getElementById('review-word');
+  var reviewPhoneticEl = document.getElementById('review-phonetic');
+  var reviewAnswerBlock = document.getElementById('review-answer-block');
+  var reviewMeaningEl = document.getElementById('review-meaning');
+  var reviewExampleEl = document.getElementById('review-example');
+  var reviewTranslationEl = document.getElementById('review-translation');
+  var reviewProgressEl = document.getElementById('review-progress');
+  var reviewProgressFill = document.getElementById('review-progress-fill');
+  var reviewShowBtn = document.getElementById('review-show-btn');
+  var reviewRateRow = document.getElementById('review-rate-row');
+
+  function startReview(){
+    reviewList = shuffle(computeDueList());
+    if (!reviewList.length){
+      showDone('오늘 복습할 단어가 없어요! 🎉', [{label:'안내', value:'내일 다시 확인해보세요'}], showModuleMenu);
+      return;
+    }
+    reviewIndex = 0;
+    showPanel('review-panel');
+    loadReviewCard();
+  }
+
+  function loadReviewCard(){
+    reviewRevealed = false;
+    reviewAnswerBlock.classList.remove('show');
+    reviewRateRow.style.display = 'none';
+    reviewShowBtn.style.display = 'inline-block';
+    var w = reviewList[reviewIndex];
+    reviewWordEl.textContent = w.word;
+    reviewPhoneticEl.textContent = w.phonetic || '';
+    reviewMeaningEl.textContent = w.meaning;
+    reviewExampleEl.textContent = w.example || '';
+    reviewTranslationEl.textContent = w.translation || '';
+    reviewProgressEl.textContent = (reviewIndex+1) + ' / ' + reviewList.length;
+    reviewProgressFill.style.width = Math.round((reviewIndex/reviewList.length)*100) + '%';
+  }
+
+  document.getElementById('review-listen-btn').addEventListener('click', function(){
+    speakText(reviewList[reviewIndex].word);
+  });
+  reviewShowBtn.addEventListener('click', function(){
+    reviewRevealed = true;
+    reviewAnswerBlock.classList.add('show');
+    reviewShowBtn.style.display = 'none';
+    reviewRateRow.style.display = 'flex';
+  });
+  reviewRateRow.querySelectorAll('.rate-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      if (!reviewRevealed) return;
+      var q = parseInt(btn.dataset.q, 10);
+      updateSrs(reviewList[reviewIndex].word, q);
+      reviewIndex++;
+      if (reviewIndex >= reviewList.length){
+        showDone('오늘의 복습 완료! 🔁', [
+          {label:'복습한 단어', value: reviewList.length + '개'},
+          {label:'다음 복습', value:'기억 정도에 따라 자동 예약됨'}
+        ], startReview);
+      } else { loadReviewCard(); }
+    });
+  });
+
+})();
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('service-worker.js').catch(function () {});
+    });
+  }
+</script>
+</body>
+</html>

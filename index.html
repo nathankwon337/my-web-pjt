@@ -70,7 +70,7 @@
 
   .game-grid{
     display:grid;
-    grid-template-columns:repeat(3, 1fr);
+    grid-template-columns:repeat(2, 1fr);
     gap:24px;
   }
 
@@ -118,6 +118,7 @@
   .game-card-wrap:nth-child(1) .manual-link:hover{ color:var(--primary); background:#EEF1FB; }
   .game-card-wrap:nth-child(2) .manual-link:hover{ color:var(--success); background:#EEF7EE; }
   .game-card-wrap:nth-child(3) .manual-link:hover{ color:#C97A2B; background:#FBF1E5; }
+  .game-card-wrap:nth-child(4) .manual-link:hover{ color:#6C4AB6; background:#F3EEFB; }
 
   .game-art{
     height:190px;
@@ -127,6 +128,7 @@
   .game-art.sentence-art{ background:linear-gradient(160deg,#EEF1FB,#DDE4F8); }
   .game-art.match-art{ background:linear-gradient(160deg,#EEF9EE,#DBF0DC); }
   .game-art.speak-art{ background:linear-gradient(160deg,#FDF3E4,#FAE4C4); }
+  .game-art.voca-art{ background:linear-gradient(160deg,#F3EEFB,#E1D5F5); }
   .game-art svg{ position:absolute; inset:0; width:100%; height:100%; }
 
   .game-body{
@@ -148,6 +150,7 @@
   .game-kicker.sentence{ color:var(--primary); }
   .game-kicker.match{ color:var(--success-dark); }
   .game-kicker.speak{ color:#C97A2B; }
+  .game-kicker.voca{ color:#6C4AB6; }
 
   .game-card h2{
     font-family:'Noto Serif KR', serif;
@@ -181,11 +184,11 @@
   .game-card.sentence-card .play-pill{ background:var(--primary); }
   .game-card.match-card .play-pill{ background:var(--success); }
   .game-card.speak-card .play-pill{ background:#C97A2B; }
+  .game-card.voca-card .play-pill{ background:#6C4AB6; }
   .game-card:active .play-pill{ transform:scale(0.98); }
 
-  @media (max-width:900px){
-    .game-grid{ grid-template-columns:1fr 1fr; }
-    .game-card-wrap:nth-child(3){ grid-column:1 / -1; }
+  @media (max-width:640px){
+    .game-grid{ grid-template-columns:1fr; }
   }
 
   @media (max-width:600px){
@@ -212,7 +215,7 @@
   <header class="top">
     <div class="eyebrow">Learning games</div>
     <h1>어떤 게임을 해볼까요?</h1>
-    <p>외국어 문장과 단어를 재미있게 익히는 세 가지 게임 중 하나를 골라보세요.</p>
+    <p>외국어 문장과 단어, 토플 보카까지 재미있게 익히는 네 가지 학습 게임 중 하나를 골라보세요.</p>
   </header>
 
   <div class="game-grid">
@@ -399,6 +402,74 @@
       </div>
     </a>
     <a class="manual-link" href="speaking_practice_game_manual.pdf" target="_blank" rel="noopener">📄 사용 설명서 (Android 전용)</a>
+    </div>
+
+    <div class="game-card-wrap">
+    <a class="game-card voca-card" href="voca_trainer.html">
+      <div class="game-art voca-art">
+        <svg viewBox="0 0 400 190" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="vocaPurple" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#8A6BD1"/>
+              <stop offset="1" stop-color="#6C4AB6"/>
+            </linearGradient>
+            <linearGradient id="vocaPurpleLight" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#F6F3FC"/>
+              <stop offset="1" stop-color="#E7DEF7"/>
+            </linearGradient>
+            <filter id="vocaShadow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="3" stdDeviation="3.2" flood-color="#1E2A44" flood-opacity="0.20"/>
+            </filter>
+          </defs>
+
+          <!-- soft depth blobs -->
+          <circle cx="366" cy="4" r="84" fill="#6C4AB6" opacity="0.12"/>
+          <circle cx="8" cy="186" r="70" fill="#8A6BD1" opacity="0.10"/>
+
+          <!-- main flashcard -->
+          <g filter="url(#vocaShadow)">
+            <rect x="42" y="26" width="168" height="112" rx="14" fill="url(#vocaPurple)"/>
+            <text x="126" y="72" text-anchor="middle" font-family="Space Grotesk, monospace" font-weight="700" font-size="20" fill="#fff">disperse</text>
+            <text x="126" y="94" text-anchor="middle" font-family="Space Grotesk, monospace" font-size="12" fill="#E7DEF7">[dispə́:rs]</text>
+            <text x="126" y="118" text-anchor="middle" font-family="Noto Serif KR, serif" font-weight="600" font-size="13" fill="#fff">흩어지게 하다</text>
+          </g>
+
+          <!-- stacked card behind -->
+          <rect x="52" y="18" width="168" height="112" rx="14" fill="#D9CBF0" opacity="0.7" transform="translate(6,-6)"/>
+
+          <!-- synonym chips -->
+          <g filter="url(#vocaShadow)">
+            <rect x="234" y="30" width="88" height="30" rx="15" fill="url(#vocaPurpleLight)" stroke="#C6B3E8" stroke-width="1.2"/>
+            <text x="278" y="50" text-anchor="middle" font-family="Space Grotesk, monospace" font-weight="700" font-size="12" fill="#6C4AB6">scatter</text>
+
+            <rect x="246" y="68" width="98" height="30" rx="15" fill="url(#vocaPurpleLight)" stroke="#C6B3E8" stroke-width="1.2"/>
+            <text x="295" y="88" text-anchor="middle" font-family="Space Grotesk, monospace" font-weight="700" font-size="12" fill="#6C4AB6">dissipate</text>
+
+            <rect x="228" y="106" width="82" height="30" rx="15" fill="url(#vocaPurpleLight)" stroke="#C6B3E8" stroke-width="1.2"/>
+            <text x="269" y="126" text-anchor="middle" font-family="Space Grotesk, monospace" font-weight="700" font-size="12" fill="#6C4AB6">spread</text>
+          </g>
+
+          <!-- connecting lines from flashcard to synonym chips -->
+          <path d="M210 60 C 222 55, 224 48, 234 45" fill="none" stroke="#8A6BD1" stroke-width="1.8" stroke-linecap="round" opacity="0.55"/>
+          <path d="M210 82 C 226 83, 230 83, 246 83" fill="none" stroke="#8A6BD1" stroke-width="1.8" stroke-linecap="round" opacity="0.55"/>
+          <path d="M210 104 C 220 112, 222 116, 228 121" fill="none" stroke="#8A6BD1" stroke-width="1.8" stroke-linecap="round" opacity="0.55"/>
+
+          <!-- SRS review badge -->
+          <g filter="url(#vocaShadow)">
+            <circle cx="352" cy="150" r="16" fill="url(#vocaPurple)"/>
+            <path d="M346 150 a6 6 0 1 1 2 4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M346 146 v4 h4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+        </svg>
+      </div>
+      <div class="game-body">
+        <span class="game-kicker voca">TOEFL Voca Trainer</span>
+        <h2>VOCA 트레이닝</h2>
+        <p class="desc">토플·토익 보카를 플래시카드, 동의어 매칭, 빈칸 채우기, 혼동 어휘 퀴즈, 망각곡선 복습까지 5가지 방식으로 정복해보세요.</p>
+        <span class="play-pill">보카 트레이닝 시작하기 →</span>
+      </div>
+    </a>
+    <a class="manual-link" href="voca_trainer_manual.pdf" target="_blank" rel="noopener">📄 사용 설명서 (PDF)</a>
     </div>
   </div>
 </div>

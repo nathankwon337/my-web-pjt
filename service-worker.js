@@ -3,7 +3,7 @@
 // This covers same-origin pages AND cross-origin assets (Google Fonts, SheetJS from
 // cdnjs) automatically, since every fetch the page makes passes through here.
 
-const CACHE_NAME = 'learning-games-v2';
+const CACHE_NAME = 'learning-games-v5';
 
 // Core pages/assets to pre-cache the first time the service worker installs
 // (this first install still needs to happen while online).
@@ -13,6 +13,7 @@ const CORE_ASSETS = [
   './sentence_card_game.html',
   './word_match_game.html',
   './speaking_practice_game.html',
+  './voca_trainer.html',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
