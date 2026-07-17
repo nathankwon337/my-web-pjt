@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sentence card game</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -512,6 +512,8 @@
   body.ck-dragging, body.ck-dragging *{
     cursor:grabbing !important;
   }
+  /* Long-press dictionary lookup styling (.dict-lookup-armed, .dict-lookup-popover, ...)
+     is injected by dict_lookup.js so it stays consistent across every game. */
 
   .word-card.in-answer.flash-correct{
     background:var(--success);
@@ -777,6 +779,9 @@
 </style>
 </head>
 <body>
+<script src="gamify_config.js"></script>
+<script src="gamify.js"></script>
+<script src="dict_lookup.js"></script>
 <div class="app">
   <header class="top">
     <div class="title-group">
@@ -828,7 +833,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
         <label for="gh-branch">브랜치</label>
         <input type="text" id="gh-branch" placeholder="비워두면 기본 브랜치 사용">
       </div>
-      <p class="hint">공개(public) 저장소만 지원합니다. 이 페이지가 GitHub Pages(*.github.io)에서 열려 있다면 사용자·저장소·폴더를 자동으로 채워봅니다 (필요하면 직접 수정하세요).</p>
+      <p class="hint">공개(public) 저장소만 지원합니다. 이 페이지가 GitHub Pages(*.github.io)에서 열려 있다면 사용자·저장소·폴더를 자동으로 채워봅니다 (필요하면 직접 수정하세요). 파일명에 <code>[Sentence]</code> 표시가 있는 엑셀 파일만 목록에 표시됩니다.</p>
       <div style="margin-top:10px;">
         <button class="ghost-btn" id="gh-list-btn">엑셀 파일 목록 불러오기</button>
       </div>
@@ -887,6 +892,21 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
       <div class="settings-row">
         <button class="ghost-btn" id="sound-test-btn" type="button">효과음 테스트</button>
       </div>
+
+      <label class="settings-row">
+        <input type="checkbox" id="dict-enable" checked>
+        단어 카드를 길게 눌러 사전 찾아보기 (베타)
+      </label>
+      <div class="settings-row" id="dict-provider-row">
+        <label for="dict-provider">사전 선택</label>
+        <select id="dict-provider">
+          <option value="naver">네이버 사전</option>
+          <option value="daum">다음 사전</option>
+          <option value="merriam">Merriam-Webster (영어 전용)</option>
+          <option value="google">Google 정의 검색</option>
+        </select>
+      </div>
+      <p class="hint">아래 단어 카드를 약 0.5초간 길게 누르면 뜻을 찾아볼 수 있는 작은 팝업이 뜹니다. 완성한 문장 쪽 카드는 드래그로 순서를 바꾸는 동작과 겹치지 않도록 사전 기능이 적용되지 않아요.</p>
     </div>
 
     <div class="setup-actions">
@@ -985,6 +1005,9 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   var pronounceLang = 'en-US';
   var soundEnabled = true;
 
+  var dictLookupEnabled = true;
+  var dictProvider = 'naver';
+
   var sentenceActiveMs = 0;   // active solving time accumulated for the current sentence (ms)
   var activeSince = 0;        // timestamp when the active period started, 0 while paused
   var timePerSentence = [];   // seconds of active solving time per sentence, recorded when moving on
@@ -1027,6 +1050,9 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
 
   var soundEnableCb = document.getElementById('sound-enable');
   var soundTestBtn = document.getElementById('sound-test-btn');
+
+  var dictEnableCb = document.getElementById('dict-enable');
+  var dictProviderSelect = document.getElementById('dict-provider');
 
   var progressLabel = document.getElementById('progress-label');
   var progressFill = document.getElementById('progress-fill');
@@ -1082,6 +1108,18 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   function speakWord(text){
     if (!pronounceEnabled) return;
     doSpeak(text, pronounceLang);
+  }
+
+  // ---------- external dictionary lookup (long-press on a word card) ----------
+  // The actual URL-building, popover UI, and long-press detection now live in
+  // dict_lookup.js, shared across all four games. This just wires this game's
+  // settings (enabled/provider/language) into that shared module.
+  function getLangCode(){
+    return (pronounceLang || 'en-US').split('-')[0].toLowerCase();
+  }
+
+  function getDictSettings(){
+    return { enabled: dictLookupEnabled, provider: dictProvider, langCode: getLangCode() };
   }
 
   pronounceTestBtn.addEventListener('click', function(){
@@ -1198,7 +1236,38 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     return (currentPos >= order.length - 1) ? '결과 확인' : '다음 문장 →';
   }
 
-  function setSentenceSet(list){
+  // Best-effort language detection: prefer hints in the source filename
+  // (e.g. "Deutsch", "Japanese", "TOEFL"), then fall back to scanning the
+  // loaded sentences themselves for script/word cues.
+  function detectLangFromFilename(name){
+    var s = (name || '').toLowerCase();
+    if (/deutsch|german/.test(s)) return 'de-DE';
+    if (/chinese|mandarin/.test(s)) return 'zh-CN';
+    if (/japanese/.test(s)) return 'ja-JP';
+    if (/french/.test(s)) return 'fr-FR';
+    if (/spanish/.test(s)) return 'es-ES';
+    if (/italian/.test(s)) return 'it-IT';
+    if (/russian/.test(s)) return 'ru-RU';
+    if (/portuguese/.test(s)) return 'pt-BR';
+    if (/vietnamese/.test(s)) return 'vi-VN';
+    if (/\bthai\b/.test(s)) return 'th-TH';
+    if (/indonesian/.test(s)) return 'id-ID';
+    if (/korean/.test(s)) return 'ko-KR';
+    if (/toefl|english/.test(s)) return 'en-US';
+    return null;
+  }
+  function detectLangFromContent(list){
+    var sample = list.slice(0, 5).map(function(s){ return s.en; }).join(' ');
+    if (/[\u3040-\u30ff]/.test(sample)) return 'ja-JP';
+    if (/[\u4e00-\u9fff]/.test(sample)) return 'zh-CN';
+    if (/[äöüßÄÖÜ]/.test(sample)) return 'de-DE';
+    return null;
+  }
+  function detectPronounceLang(filename, list){
+    return detectLangFromFilename(filename) || detectLangFromContent(list);
+  }
+
+  function setSentenceSet(list, filename){
     sentenceSet = list;
     previousRunStats = null; // a fresh sentence set starts a new comparison baseline
     if (!list.length){
@@ -1223,6 +1292,11 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
       previewList.appendChild(more);
     }
     startBtn.disabled = false;
+
+    // Auto-set the pronunciation language from the loaded file; the user can
+    // still change it manually afterward via the settings dropdown.
+    var detected = detectPronounceLang(filename, list);
+    if (detected) pronounceLangSelect.value = detected;
   }
 
   // ---------- text parsing ----------
@@ -1292,7 +1366,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
           setSentenceSet([]);
           return;
         }
-        setSentenceSet(result);
+        setSentenceSet(result, file.name);
       } catch (err){
         showError('엑셀 파일을 읽는 중 오류가 발생했습니다.');
         setSentenceSet([]);
@@ -1357,7 +1431,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
           throw new Error('입력한 경로가 폴더가 아닙니다.');
         }
         var files = items.filter(function(it){
-          return it.type === 'file' && /\.(xlsx|xls)$/i.test(it.name);
+          return it.type === 'file' && /\.(xlsx|xls)$/i.test(it.name) && /\[sentence\]/i.test(it.name);
         });
         renderGhFileList(files);
       })
@@ -1370,7 +1444,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
 
   function renderGhFileList(files){
     if (!files.length){
-      setGhFileListContent('<div class="gh-file-note">이 폴더에서 엑셀 파일(.xlsx, .xls)을 찾지 못했습니다.</div>');
+      setGhFileListContent('<div class="gh-file-note">이 폴더에서 "[Sentence]" 표시가 있는 엑셀 파일(.xlsx, .xls)을 찾지 못했습니다.</div>');
       return;
     }
     ghFileList.innerHTML = '';
@@ -1406,7 +1480,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
           setSentenceSet([]);
           return;
         }
-        setSentenceSet(result);
+        setSentenceSet(result, file.name);
       })
       .catch(function(err){
         showError(err.message || '파일을 불러오는 중 오류가 발생했습니다.');
@@ -1428,6 +1502,8 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     pronounceEnabled = pronounceEnableCb.checked;
     pronounceLang = pronounceLangSelect.value;
     soundEnabled = soundEnableCb.checked;
+    dictLookupEnabled = dictEnableCb.checked;
+    dictProvider = dictProviderSelect.value;
 
     order = shuffle(sentenceSet.map(function(_, i){ return i; }));
     currentPos = 0;
@@ -1444,6 +1520,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   }
 
   function loadSentence(){
+    DictLookup.hidePopover();
     awaitingNext = false;
     currentSentenceCorrect = false;
     feedbackEl.style.display = 'none';
@@ -1613,7 +1690,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     el.className = 'word-card';
     el.textContent = tok.text;
     el.dataset.id = tok.id;
-    el.addEventListener('click', function(){
+    DictLookup.attach(el, function(){ return tok.text; }, getDictSettings, function(){
       if (awaitingNext) return;
       bank = bank.filter(function(t){ return t.id !== tok.id; });
       answer.push(tok);
@@ -1848,6 +1925,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   }
 
   function finishGame(){
+    DictLookup.hidePopover();
     stopTimer();
     document.body.classList.remove('in-game');
     gamePanel.style.display = 'none';
@@ -1863,6 +1941,16 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
 
     renderHighlights();
     renderComparison(totalSeconds, avgSeconds);
+
+    if (window.Gamify){
+      Gamify.reportResult({
+        game: 'sentence',
+        accuracy: order.length ? (score / order.length) : 0,
+        comboMax: bestStreak,
+        correctCount: score,
+        totalCount: order.length
+      });
+    }
 
     previousRunStats = {
       score: score,
@@ -1935,6 +2023,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   });
 
   quitBtn.addEventListener('click', function(){
+    DictLookup.hidePopover();
     stopTimer();
     document.body.classList.remove('in-game');
     gamePanel.style.display = 'none';

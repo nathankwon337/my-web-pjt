@@ -10,8 +10,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Speaking practice game">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.18.2/dist/index.js" defer></script>
+<script src="xlsx.full.min.js"></script>
+<script src="pinyin-pro.min.js" defer></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -303,6 +303,9 @@
 </style>
 </head>
 <body>
+<script src="gamify_config.js"></script>
+<script src="gamify.js"></script>
+<script src="dict_lookup.js"></script>
 <div class="app">
   <header class="top">
     <div class="title-group">
@@ -373,7 +376,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
         <label for="gh-branch">브랜치</label>
         <input type="text" id="gh-branch" placeholder="비워두면 기본 브랜치 사용">
       </div>
-      <p class="hint">공개(public) 저장소만 지원합니다. 이 폴더의 엑셀 파일(.xlsx, .xls) 목록이 모두 표시됩니다.</p>
+      <p class="hint">공개(public) 저장소만 지원합니다. 파일명에 <code>[Sentence]</code> 표시가 있는 엑셀 파일만 목록에 표시됩니다.</p>
       <div style="margin-top:10px;">
         <button class="ghost-btn" id="gh-list-btn">엑셀 파일 목록 불러오기</button>
       </div>
@@ -431,6 +434,21 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
         통과/실패 효과음 재생하기
       </label>
       <p class="hint">중국어 문장은 한자마다 한어병음이 자동으로 함께 표시돼요.</p>
+
+      <label class="settings-row">
+        <input type="checkbox" id="dict-enable" checked>
+        문장 속 단어를 탭하면 사전 찾아보기 (베타)
+      </label>
+      <div class="settings-row" id="dict-provider-row">
+        <label for="dict-provider">사전 선택</label>
+        <select id="dict-provider">
+          <option value="naver">네이버 사전</option>
+          <option value="daum">다음 사전</option>
+          <option value="merriam">Merriam-Webster (영어 전용)</option>
+          <option value="google">Google 정의 검색</option>
+        </select>
+      </div>
+      <p class="hint">띄어쓰기가 있는 언어(영어·독일어 등)에서만 지원돼요. 중국어·일본어는 글자 단위라 사전 연결이 정확하지 않을 수 있어 제외했어요.</p>
     </div>
 
     <div class="setup-actions">
@@ -524,6 +542,8 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   var difficultyThreshold = 70;
   var speechLang = 'en-US';
   var soundEnabled = true;
+  var dictLookupEnabled = true;
+  var dictProvider = 'naver';
   var recognizer = null;
   var listening = false;
   var noSpeechTimer = null;
@@ -554,6 +574,8 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
   var difficultyGroup = document.getElementById('difficulty-group');
   var speechLangSelect = document.getElementById('speech-lang');
   var soundEnableCb = document.getElementById('sound-enable');
+  var dictEnableCb = document.getElementById('dict-enable');
+  var dictProviderSelect = document.getElementById('dict-provider');
 
   var progressLabel = document.getElementById('progress-label');
   var diffLabel = document.getElementById('diff-label');
@@ -629,7 +651,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     return m + ':' + (r < 10 ? '0' : '') + r;
   }
 
-  function setSentenceSet(list){
+  function setSentenceSet(list, filename){
     sentenceSet = list;
     if (!list.length){
       previewWrap.style.display = 'none';
@@ -654,14 +676,33 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     }
     startBtn.disabled = false;
 
-    var detectedLang = detectSpeechLang(list);
+    var detectedLang = detectSpeechLang(list, filename);
     if (detectedLang) speechLangSelect.value = detectedLang;
   }
 
-  // Best-effort language detection from the loaded sentences, to pre-fill
-  // the pronunciation/recognition language instead of leaving it on the
-  // previous selection.
-  function detectSpeechLang(list){
+  // Best-effort language detection: prefer hints in the source filename
+  // (e.g. "Deutsch", "Japanese", "TOEFL"), then fall back to scanning the
+  // loaded sentences themselves for script/word cues. The user can still
+  // change the dropdown manually afterward.
+  function detectLangFromFilename(name){
+    var s = (name || '').toLowerCase();
+    if (/deutsch|german/.test(s)) return 'de-DE';
+    if (/chinese|mandarin/.test(s)) return 'zh-CN';
+    if (/japanese/.test(s)) return 'ja-JP';
+    if (/french/.test(s)) return 'fr-FR';
+    if (/spanish/.test(s)) return 'es-ES';
+    if (/italian/.test(s)) return 'it-IT';
+    if (/russian/.test(s)) return 'ru-RU';
+    if (/portuguese/.test(s)) return 'pt-BR';
+    if (/vietnamese/.test(s)) return 'vi-VN';
+    if (/\bthai\b/.test(s)) return 'th-TH';
+    if (/indonesian/.test(s)) return 'id-ID';
+    if (/toefl|english/.test(s)) return 'en-US';
+    return null;
+  }
+  function detectSpeechLang(list, filename){
+    var byName = detectLangFromFilename(filename);
+    if (byName) return byName;
     var sample = list.slice(0, 5).map(function(s){ return s.en; }).join(' ');
     if (isJapaneseText(sample)) return 'ja-JP';
     if (isChineseText(sample)) return 'zh-CN';
@@ -734,7 +775,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
           setSentenceSet([]);
           return;
         }
-        setSentenceSet(result);
+        setSentenceSet(result, file.name);
       } catch (err){
         showError('엑셀 파일을 읽는 중 오류가 발생했습니다.');
         setSentenceSet([]);
@@ -797,7 +838,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
       .then(function(items){
         if (!Array.isArray(items)) throw new Error('입력한 경로가 폴더가 아닙니다.');
         var files = items.filter(function(it){
-          return it.type === 'file' && /\.(xlsx|xls)$/i.test(it.name);
+          return it.type === 'file' && /\.(xlsx|xls)$/i.test(it.name) && /\[sentence\]/i.test(it.name);
         });
         renderGhFileList(files);
       })
@@ -810,7 +851,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
 
   function renderGhFileList(files){
     if (!files.length){
-      setGhFileListContent('<div class="gh-file-note">이 폴더에서 엑셀 파일(.xlsx, .xls)을 찾지 못했습니다.</div>');
+      setGhFileListContent('<div class="gh-file-note">이 폴더에서 "[Sentence]" 표시가 있는 엑셀 파일(.xlsx, .xls)을 찾지 못했습니다.</div>');
       return;
     }
     ghFileList.innerHTML = '';
@@ -842,7 +883,7 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
           setSentenceSet([]);
           return;
         }
-        setSentenceSet(result);
+        setSentenceSet(result, file.name);
       })
       .catch(function(err){ showError(err.message || '파일을 불러오는 중 오류가 발생했습니다.'); })
       .then(function(){ if (pickLabel) pickLabel.textContent = '불러오기 →'; });
@@ -906,6 +947,15 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
       utter.onerror = function(){ listenBtn.classList.remove('active'); };
       window.speechSynthesis.speak(utter);
     } catch (err) { /* ignore */ }
+  }
+
+  // ---------- external dictionary lookup (long-press a word in the sentence) ----------
+  function getLangCode(){
+    return (speechLang || 'en-US').split('-')[0].toLowerCase();
+  }
+
+  function getDictSettings(){
+    return { enabled: dictLookupEnabled, provider: dictProvider, langCode: getLangCode() };
   }
 
   // ---------- text normalization + LCS matching ----------
@@ -977,6 +1027,8 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     difficultyThreshold = checkedDiff ? parseInt(checkedDiff.value, 10) : 70;
     speechLang = speechLangSelect.value;
     soundEnabled = soundEnableCb.checked;
+    dictLookupEnabled = dictEnableCb.checked;
+    dictProvider = dictProviderSelect.value;
     startGame();
   });
 
@@ -1063,6 +1115,19 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     // reading annotations above the kanji.
 
     targetSentence.innerHTML = spans.join('');
+
+    // Dictionary lookup only makes sense for space-delimited languages — for
+    // CJK the tokens are single characters, and looking up one hanzi/kana at
+    // a time rarely gives a useful dictionary result. A single tap (rather
+    // than long-press) opens it, since these tokens are plain sentence text
+    // with no other tap action to disambiguate against, and holding down on
+    // text otherwise triggers the phone's own text-selection "Copy" popup
+    // alongside ours.
+    if (!cjk){
+      Array.prototype.forEach.call(targetSentence.querySelectorAll('.word-token'), function(tokenEl){
+        DictLookup.attachTap(tokenEl, function(){ return tokenEl.textContent; }, getDictSettings);
+      });
+    }
   }
 
   listenBtn.addEventListener('click', function(){
@@ -1267,20 +1332,33 @@ She likes reading books. | 그녀는 책 읽는 것을 좋아한다."></textarea
     statTotalTime.textContent = formatMinSec(totalElapsed);
     statAvgScore.textContent = (scoreCount ? Math.round(scoreSum / scoreCount) : 0) + '%';
     statAvgAttempts.textContent = (order.length ? (totalAttempts / order.length).toFixed(1) : '0') + '회';
+
+    if (window.Gamify){
+      Gamify.reportResult({
+        game: 'speaking',
+        accuracy: scoreCount ? (scoreSum / scoreCount / 100) : 0,
+        comboMax: 0,
+        correctCount: passCount,
+        totalCount: order.length
+      });
+    }
   }
 
   quitBtn.addEventListener('click', function(){
+    DictLookup.hidePopover();
     if (listening) stopListening();
     gamePanel.style.display = 'none';
     setupPanel.style.display = 'block';
   });
 
   replayBtn.addEventListener('click', function(){
+    DictLookup.hidePopover();
     donePanel.style.display = 'none';
     startGame();
   });
 
   newSetBtn.addEventListener('click', function(){
+    DictLookup.hidePopover();
     donePanel.style.display = 'none';
     setupPanel.style.display = 'block';
   });

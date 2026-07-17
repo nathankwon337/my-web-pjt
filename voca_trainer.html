@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="TOEFL Voca Trainer">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -226,6 +226,9 @@
 </style>
 </head>
 <body>
+<script src="gamify_config.js"></script>
+<script src="gamify.js"></script>
+<script src="dict_lookup.js"></script>
 <div class="app">
   <header class="top">
     <div class="title-group">
@@ -267,7 +270,7 @@
       <div class="gh-field"><label for="gh-repo">저장소</label><input type="text" id="gh-repo" placeholder="예: my-repo"></div>
       <div class="gh-field"><label for="gh-path">폴더 경로</label><input type="text" id="gh-path" placeholder="비워두면 저장소 최상위 폴더"></div>
       <div class="gh-field"><label for="gh-branch">브랜치</label><input type="text" id="gh-branch" placeholder="비워두면 기본 브랜치 사용"></div>
-      <p class="hint">공개(public) 저장소만 지원합니다. 이 폴더의 엑셀 파일(.xlsx, .xls) 목록이 모두 표시됩니다.</p>
+      <p class="hint">공개(public) 저장소만 지원합니다. 파일명에 <code>[Voca]</code> 표시가 있는 엑셀 파일만 목록에 표시됩니다.</p>
       <div style="margin-top:10px;"><button class="ghost-btn" id="gh-list-btn">엑셀 파일 목록 불러오기</button></div>
       <div id="gh-file-list" class="gh-file-list is-hidden"></div>
     </div>
@@ -287,8 +290,32 @@
         <select id="speech-lang">
           <option value="en-US" selected>영어 (미국)</option>
           <option value="en-GB">영어 (영국)</option>
+          <option value="de-DE">독일어</option>
+          <option value="ja-JP">일본어</option>
+          <option value="zh-CN">중국어 (간체)</option>
+          <option value="fr-FR">프랑스어</option>
+          <option value="es-ES">스페인어</option>
+          <option value="it-IT">이탈리아어</option>
+          <option value="ru-RU">러시아어</option>
+          <option value="pt-BR">포르투갈어 (브라질)</option>
+          <option value="vi-VN">베트남어</option>
+          <option value="th-TH">태국어</option>
+          <option value="id-ID">인도네시아어</option>
+          <option value="ko-KR">한국어</option>
         </select>
       </div>
+
+      <label class="settings-row"><input type="checkbox" id="dict-enable" checked> 표제어를 길게 눌러 사전 찾아보기 (베타)</label>
+      <div class="settings-row" id="dict-provider-row">
+        <label for="dict-provider" style="font-weight:600; color:var(--ink-soft);">사전 선택</label>
+        <select id="dict-provider">
+          <option value="naver">네이버 사전</option>
+          <option value="daum">다음 사전</option>
+          <option value="merriam">Merriam-Webster (영어 전용)</option>
+          <option value="google">Google 정의 검색</option>
+        </select>
+      </div>
+      <p class="hint">카드 학습의 표제어는 한 번 탭하면, 짝맞추기의 표제어는 약 0.5초간 길게 누르면 뜻을 찾아볼 수 있는 팝업이 떠요. 빈칸 채우기·혼동 어휘 퀴즈에는 적용되지 않아요 (정답을 바로 찾아버릴 수 있어서요).</p>
     </div>
 
     <div class="setup-actions"><button class="primary-btn" id="start-btn" disabled>학습 시작하기</button></div>
@@ -462,6 +489,8 @@
   var soundEnabled = true;
   var autoSpeakEnabled = true;
   var speechLang = 'en-US';
+  var dictLookupEnabled = true;
+  var dictProvider = 'naver';
 
   // ---------- element refs: setup ----------
   var setupPanel = document.getElementById('setup-panel');
@@ -477,6 +506,8 @@
   var soundEnableCb = document.getElementById('sound-enable');
   var autospeakEnableCb = document.getElementById('autospeak-enable');
   var speechLangSelect = document.getElementById('speech-lang');
+  var dictEnableCb = document.getElementById('dict-enable');
+  var dictProviderSelect = document.getElementById('dict-provider');
 
   var ghOwnerInput = document.getElementById('gh-owner');
   var ghRepoInput = document.getElementById('gh-repo');
@@ -511,6 +542,7 @@
   function showError(msg){ parseError.textContent = msg; parseError.style.display = msg ? 'block' : 'none'; }
   function escapeHtml(str){ var d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
   function showPanel(id){
+    if (window.DictLookup) DictLookup.hidePopover();
     ['setup-panel','module-panel','flashcard-panel','match-panel','cloze-panel','confusable-panel','review-panel','module-done-panel']
       .forEach(function(p){ document.getElementById(p).style.display = (p === id) ? 'block' : 'none'; });
   }
@@ -613,7 +645,38 @@
     return { data: result };
   }
 
-  function setVocabSet(list){
+  // Best-effort language detection: prefer hints in the source filename
+  // (e.g. "Deutsch", "Japanese", "TOEFL"), then fall back to scanning the
+  // loaded words themselves for script/word cues.
+  function detectLangFromFilename(name){
+    var s = (name || '').toLowerCase();
+    if (/deutsch|german/.test(s)) return 'de-DE';
+    if (/chinese|mandarin/.test(s)) return 'zh-CN';
+    if (/japanese/.test(s)) return 'ja-JP';
+    if (/french/.test(s)) return 'fr-FR';
+    if (/spanish/.test(s)) return 'es-ES';
+    if (/italian/.test(s)) return 'it-IT';
+    if (/russian/.test(s)) return 'ru-RU';
+    if (/portuguese/.test(s)) return 'pt-BR';
+    if (/vietnamese/.test(s)) return 'vi-VN';
+    if (/\bthai\b/.test(s)) return 'th-TH';
+    if (/indonesian/.test(s)) return 'id-ID';
+    if (/korean/.test(s)) return 'ko-KR';
+    if (/toefl|english/.test(s)) return 'en-US';
+    return null;
+  }
+  function detectLangFromContent(list){
+    var sample = list.slice(0, 5).map(function(w){ return w.word; }).join(' ');
+    if (/[\u3040-\u30ff]/.test(sample)) return 'ja-JP';
+    if (/[\u4e00-\u9fff]/.test(sample)) return 'zh-CN';
+    if (/[äöüßÄÖÜ]/.test(sample)) return 'de-DE';
+    return null;
+  }
+  function detectSpeechLangForVocab(filename, list){
+    return detectLangFromFilename(filename) || detectLangFromContent(list);
+  }
+
+  function setVocabSet(list, filename){
     vocabSet = list;
     if (!list.length){ previewWrap.style.display = 'none'; startBtn.disabled = true; return; }
     previewWrap.style.display = 'block';
@@ -632,6 +695,11 @@
       previewList.appendChild(more);
     }
     startBtn.disabled = false;
+
+    // Auto-set the pronunciation language from the loaded file; the user can
+    // still change it manually afterward via the settings dropdown.
+    var detected = detectSpeechLangForVocab(filename, list);
+    if (detected) speechLangSelect.value = detected;
   }
 
   parseTextBtn.addEventListener('click', function(){
@@ -655,7 +723,7 @@
         var data = new Uint8Array(evt.target.result);
         var res = parseVocabWorkbookData(data);
         if (res.error){ showError(res.error); setVocabSet([]); return; }
-        setVocabSet(res.data);
+        setVocabSet(res.data, file.name);
       } catch (err){ showError('엑셀 파일을 읽는 중 오류가 발생했습니다.'); setVocabSet([]); }
     };
     reader.readAsArrayBuffer(file);
@@ -698,13 +766,13 @@
       })
       .then(function(items){
         if (!Array.isArray(items)) throw new Error('입력한 경로가 폴더가 아닙니다.');
-        renderGhFileList(items.filter(function(it){ return it.type==='file' && /\.(xlsx|xls)$/i.test(it.name); }));
+        renderGhFileList(items.filter(function(it){ return it.type==='file' && /\.(xlsx|xls)$/i.test(it.name) && /\[voca\]/i.test(it.name); }));
       })
       .catch(function(err){ ghFileList.classList.add('is-hidden'); ghFileList.innerHTML=''; showError(err.message || '오류가 발생했습니다.'); });
   });
 
   function renderGhFileList(files){
-    if (!files.length){ setGhFileListContent('<div class="gh-file-note">이 폴더에서 엑셀 파일을 찾지 못했습니다.</div>'); return; }
+    if (!files.length){ setGhFileListContent('<div class="gh-file-note">이 폴더에서 "[Voca]" 표시가 있는 엑셀 파일을 찾지 못했습니다.</div>'); return; }
     ghFileList.innerHTML = '';
     files.forEach(function(file){
       var row = document.createElement('div');
@@ -726,7 +794,7 @@
     }).then(function(buf){
       var res = parseVocabWorkbookData(new Uint8Array(buf));
       if (res.error){ showError(res.error); setVocabSet([]); return; }
-      setVocabSet(res.data);
+      setVocabSet(res.data, file.name);
     }).catch(function(err){ showError(err.message || '파일을 불러오는 중 오류가 발생했습니다.'); })
       .then(function(){ if (pickLabel) pickLabel.textContent = '불러오기 →'; });
   }
@@ -816,8 +884,19 @@
     soundEnabled = soundEnableCb.checked;
     autoSpeakEnabled = autospeakEnableCb.checked;
     speechLang = speechLangSelect.value;
+    dictLookupEnabled = dictEnableCb.checked;
+    dictProvider = dictProviderSelect.value;
     showModuleMenu();
   });
+
+  // ---------- external dictionary lookup (long-press a headword) ----------
+  function getLangCode(){
+    return (speechLang || 'en-US').split('-')[0].toLowerCase();
+  }
+
+  function getDictSettings(){
+    return { enabled: dictLookupEnabled, provider: dictProvider, langCode: getLangCode() };
+  }
 
   function showModuleMenu(){
     moduleSetCount.textContent = vocabSet.length + '개 단어 불러옴';
@@ -850,7 +929,7 @@
   doneMenuBtn.addEventListener('click', showModuleMenu);
   doneRetryBtn.addEventListener('click', function(){ if (doneRetryHandler) doneRetryHandler(); });
 
-  function showDone(title, stats, retryHandler){
+  function showDone(title, stats, retryHandler, gamifyInfo){
     document.getElementById('done-title').textContent = title;
     var statsEl = document.getElementById('done-stats');
     statsEl.innerHTML = '';
@@ -862,6 +941,16 @@
     });
     doneRetryHandler = retryHandler;
     showPanel('module-done-panel');
+
+    if (window.Gamify && gamifyInfo){
+      Gamify.reportResult({
+        game: 'voca',
+        accuracy: (typeof gamifyInfo.accuracy === 'number') ? gamifyInfo.accuracy : null,
+        comboMax: gamifyInfo.comboMax || 0,
+        correctCount: gamifyInfo.correctCount,
+        totalCount: gamifyInfo.totalCount
+      });
+    }
   }
 
   // ================= MODULE 1: FLASHCARD =================
@@ -878,6 +967,11 @@
   var fcTranslationEl = document.getElementById('fc-translation');
   var fcProgressEl = document.getElementById('fc-progress');
   var fcProgressFill = document.getElementById('fc-progress-fill');
+  // Attached once (not per-render) so the word always resolves live via fcOrder/fcIndex.
+  // Single tap (not long-press): this is a plain word display with no other tap
+  // action, and holding down on it would otherwise trigger the phone's own
+  // text-selection "Copy" popup alongside our dictionary popover.
+  DictLookup.attachTap(fcWordEl, function(){ return vocabSet[fcOrder[fcIndex]].word; }, getDictSettings);
 
   function startFlashcard(){
     fcOrder = vocabSet.map(function(_,i){ return i; });
@@ -951,7 +1045,8 @@
   document.getElementById('fc-next-btn').addEventListener('click', function(){
     if (fcIndex < fcOrder.length - 1){ fcIndex++; renderFlashcard(); }
     else {
-      showDone('카드 학습 완료! 📇', [{label:'학습한 단어', value: fcOrder.length + '개'}], startFlashcard);
+      showDone('카드 학습 완료! 📇', [{label:'학습한 단어', value: fcOrder.length + '개'}], startFlashcard,
+        { accuracy: null, totalCount: fcOrder.length });
     }
   });
 
@@ -1018,7 +1113,13 @@
     else if ((side==='left' && card.id===matchSelectedLeft) || (side==='right' && card.id===matchSelectedRight)) cls += ' is-selected';
     el.className = cls;
     el.textContent = card.text;
-    el.addEventListener('click', function(){ onMatchCardClick(card, side); });
+    if (side === 'left'){
+      DictLookup.attach(el, function(){ return card.text; }, getDictSettings, function(){
+        onMatchCardClick(card, side);
+      });
+    } else {
+      el.addEventListener('click', function(){ onMatchCardClick(card, side); });
+    }
     return el;
   }
 
@@ -1053,7 +1154,11 @@
               showDone('동의어 매칭 완료! 🔗', [
                 {label:'전체 단어', value: matchTotalWords + '개'},
                 {label:'실수 횟수', value: matchMistakes + '회'}
-              ], startMatch);
+              ], startMatch, {
+                accuracy: (matchTotalWords + matchMistakes) ? (matchTotalWords / (matchTotalWords + matchMistakes)) : 1,
+                correctCount: matchTotalWords,
+                totalCount: matchTotalWords + matchMistakes
+              });
             } else { loadMatchBatch(); }
           }, 450);
         }
@@ -1178,7 +1283,11 @@
       showDone('빈칸 채우기 완료! ✏️', [
         {label:'정답', value: clozeScore + ' / ' + clozeItems.length},
         {label:'정확도', value: Math.round((clozeScore/clozeItems.length)*100) + '%'}
-      ], startCloze);
+      ], startCloze, {
+        accuracy: clozeItems.length ? (clozeScore / clozeItems.length) : 0,
+        correctCount: clozeScore,
+        totalCount: clozeItems.length
+      });
     } else { loadClozeQuestion(); }
   });
 
@@ -1263,12 +1372,16 @@
       showDone('혼동 어휘 퀴즈 완료! ⚠️', [
         {label:'정답', value: confScore + ' / ' + confItems.length},
         {label:'정확도', value: Math.round((confScore/confItems.length)*100) + '%'}
-      ], startConfusable);
+      ], startConfusable, {
+        accuracy: confItems.length ? (confScore / confItems.length) : 0,
+        correctCount: confScore,
+        totalCount: confItems.length
+      });
     } else { loadConfQuestion(); }
   });
 
   // ================= MODULE 5: REVIEW =================
-  var reviewList = [], reviewIndex = 0, reviewRevealed = false;
+  var reviewList = [], reviewIndex = 0, reviewRevealed = false, reviewGoodCount = 0;
   var reviewWordEl = document.getElementById('review-word');
   var reviewPhoneticEl = document.getElementById('review-phonetic');
   var reviewAnswerBlock = document.getElementById('review-answer-block');
@@ -1287,6 +1400,7 @@
       return;
     }
     reviewIndex = 0;
+    reviewGoodCount = 0;
     showPanel('review-panel');
     loadReviewCard();
   }
@@ -1319,13 +1433,18 @@
     btn.addEventListener('click', function(){
       if (!reviewRevealed) return;
       var q = parseInt(btn.dataset.q, 10);
+      if (q >= 3) reviewGoodCount++;
       updateSrs(reviewList[reviewIndex].word, q);
       reviewIndex++;
       if (reviewIndex >= reviewList.length){
         showDone('오늘의 복습 완료! 🔁', [
           {label:'복습한 단어', value: reviewList.length + '개'},
           {label:'다음 복습', value:'기억 정도에 따라 자동 예약됨'}
-        ], startReview);
+        ], startReview, {
+          accuracy: reviewList.length ? (reviewGoodCount / reviewList.length) : 0,
+          correctCount: reviewGoodCount,
+          totalCount: reviewList.length
+        });
       } else { loadReviewCard(); }
     });
   });

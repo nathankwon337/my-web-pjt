@@ -1,0 +1,109 @@
+/**
+ * 학습 게임 클라우드 동기화용 Apps Script
+ * ------------------------------------------------------
+ * 이 파일은 Google 스프레드시트에 "확장 프로그램 > Apps Script"로 붙여넣는 코드입니다.
+ * gamify.js가 이 스크립트를 "웹앱" 주소로 호출해서 프로필을 저장/조회합니다.
+ *
+ * 설치 방법은 README_적용안내.md의 "클라우드 동기화(선택) 설정 방법"을 참고하세요.
+ *
+ * 동작 방식(아주 단순합니다):
+ *  - GET  ?action=get&nickname=민준   → 그 닉네임의 저장된 프로필 JSON 반환
+ *  - GET  ?action=list                → 전체 사용자 랭킹용 요약 리스트 반환
+ *  - POST (body: 프로필 JSON 문자열)   → 해당 닉네임 행을 새로 만들거나 덮어씀
+ *
+ * 주의: 로그인/암호 확인이 없는 "신뢰 기반" 구조입니다. 가족·지인처럼 서로 아는 소규모
+ * 그룹에서 쓰는 것을 전제로 합니다. 불특정 다수에게 공개하는 서비스로 키우실 계획이라면
+ * 별도의 인증 로직 추가를 검토해주세요.
+ */
+
+var SHEET_NAME = 'profiles';
+
+function doGet(e) {
+  var action = e.parameter.action;
+  var sheet = getSheet_();
+
+  if (action === 'get') {
+    var nickname = e.parameter.nickname || '';
+    var row = findRow_(sheet, nickname);
+    if (!row) return json_({ found: false });
+    var data = safeParse_(row[1]);
+    return json_({ found: !!data, data: data });
+  }
+
+  if (action === 'list') {
+    var rows = sheet.getDataRange().getValues();
+    var list = [];
+    for (var i = 1; i < rows.length; i++) {
+      var p = safeParse_(rows[i][1]);
+      if (!p) continue;
+      list.push({
+        nickname: p.nickname,
+        totalCredits: p.totalCredits || 0,
+        league: p.league || 'bronze',
+        streak: (p.streak && p.streak.current) || 0
+      });
+    }
+    list.sort(function (a, b) { return b.totalCredits - a.totalCredits; });
+    return json_({ list: list });
+  }
+
+  return json_({ error: 'unknown action' });
+}
+
+function doPost(e) {
+  var body;
+  try {
+    body = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return json_({ error: 'invalid JSON body' });
+  }
+  if (!body || !body.nickname) return json_({ error: 'nickname required' });
+
+  var sheet = getSheet_();
+  var data = sheet.getDataRange().getValues();
+  var rowIndex = -1;
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === body.nickname) { rowIndex = i + 1; break; }
+  }
+
+  var json = JSON.stringify(body);
+  var now = new Date().toISOString();
+
+  if (rowIndex === -1) {
+    sheet.appendRow([body.nickname, json, now]);
+  } else {
+    sheet.getRange(rowIndex, 1, 1, 3).setValues([[body.nickname, json, now]]);
+  }
+  return json_({ ok: true });
+}
+
+// ---------- helpers ----------
+
+function getSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    sheet.appendRow(['nickname', 'data', 'updatedAt']);
+  }
+  return sheet;
+}
+
+function findRow_(sheet, nickname) {
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === nickname) return data[i];
+  }
+  return null;
+}
+
+function safeParse_(str) {
+  try { return JSON.parse(str); }
+  catch (err) { return null; }
+}
+
+function json_(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}

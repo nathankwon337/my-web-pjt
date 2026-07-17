@@ -1,13 +1,13 @@
 {
-  "name": "Learning games",
-  "short_name": "Learning games",
-  "description": "문장 카드 맞추기, 단어 짝맞추기, 말하기 연습, VOCA 트레이닝을 한 곳에서 즐기는 외국어 학습 게임 모음",
-  "start_url": "./index.html",
+  "name": "TOEFL Voca Trainer",
+  "short_name": "Voca Trainer",
+  "description": "단어·발음·동의어·예문·혼동어휘까지 5가지 방식으로 익히는 보카 학습 앱",
+  "start_url": "./voca_trainer.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#EEF1F6",
-  "theme_color": "#3A4CA8",
+  "theme_color": "#6C4AB6",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
